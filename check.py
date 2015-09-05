@@ -2,6 +2,22 @@
 
 # Skript ktorý sa spúšťa pri kompilácií zadaní a robí im sanity checking.
 #
+# Tento skript by default spustí všetky testy ktoré pozná (overridnuteľné
+# flagmi).
+#
+# Test
+# ----
+#
+# Test je obyčajná funkcia v sekcii skriptu "TESTY", ktorá je dekorovaná
+# @test dekorátorom. Meno tejto funkcie je názov testu (bude sa používať v
+# argumentoch, ako chybová hláška keď test zlyhá a tak.) Test musí obsahovať
+# neprázdny docstring ktorý v prvom riadku pár slovami popíše čo test robí a
+# v ostatných riadkoch (indentovaných 4mi medzerami) optionally test popíše
+# detailnejšie.
+#
+# Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a
+# docstringom, o ostatné sa starať netreba :)
+#
 # Čo týmto skriptom básnik myslel...
 # ----------------------------------
 #
@@ -9,6 +25,8 @@
 #
 #  - Dodržujte PEP-8
 #  - Snažte sa o konzistentný coding style
+#  - Nakoľko sa meno fcie testu používa v chybovej hláške o zlyhaní a tak,
+#    mená majú dávať zmysel (prosím, žiadne T_PAAMAYIM_NEKUDOTAYIM ;) )
 #  - Unix-like: "No news are good news"
 #    Nevypisujte hlúposti ak nie ste verbose.
 #  - Tento script je zatiaľ iba v zadaniach kde sa môže správať ako chce.
@@ -23,6 +41,45 @@ logger = logging.getLogger('check')
 logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - ' +
                               ' %(message)s')
+
+
+def makeTestRegistrar():
+    tests = {}
+
+    def testRegistrar(func):
+        tests[func.__name__] = {"doc": func.__doc__, "run": func}
+        return func
+    testRegistrar.all = tests
+    return testRegistrar
+
+test = makeTestRegistrar()
+
+
+# ---------------------------------- TESTY ------------------------------------
+
+
+@test
+def dummyTest1():
+    """Test testu 1.
+
+    Tento test testuje schopnosť pridávania testov pomocou dekorátorov.
+    A toto je dlhááá dokumentáci ak nemu."""
+    pass
+
+
+@test
+def dummyTest2():
+    """Hlúpy ničohoneschopný test na pokus 2"""
+    pass
+
+
+# -----------------------------------------------------------------------------
+
+
+def print_tests():
+    for tst in test.all:
+        print(tst, " - ", test.all[tst]['doc'])
+        print()
 
 
 def main():
@@ -52,6 +109,12 @@ def main():
     argumentParser.add_argument('-v', action="count", dest="verbosity",
                                 help="Viac sa vykecávaj (-vv kecá ešte viac)")
     args = argumentParser.parse_args()
+
+    if args.print_only:
+        print_tests()
+        return 0
+
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
