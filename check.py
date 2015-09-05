@@ -99,13 +99,9 @@ def main():
                                 help="Správaj sa k warningom ako k chybám")
     argumentParser.add_argument('-s', '--skip', nargs='*', dest="skip",
                                 metavar="test", help="Preskoč tieto testy")
-    argumentParser.add_argument('-e', '--enforce', nargs='*', dest="enforce",
-                                metavar="test", help="Nezávisle od configu " +
-                                "spusti tieto testy. Overridne --skip.")
     argumentParser.add_argument('-r', '--run-only', nargs='*', dest="runonly",
-                                metavar="test", help="Nezávisle od configu " +
-                                "spusti IBA tieto testy. Overridne --skip aj" +
-                                " --enforce")
+                                metavar="test", help="spusti IBA tieto " +
+                                "testy. Overridne --skip")
     argumentParser.add_argument('-v', action="count", dest="verbosity",
                                 help="Viac sa vykecávaj (-vv kecá ešte viac)")
     args = argumentParser.parse_args()
