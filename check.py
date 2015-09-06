@@ -46,17 +46,15 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
-def makeTestRegistrar():
-    tests = {}
+class TestRegistrar():
+    def __init__(self):
+        self.all = {}
 
-    def testRegistrar(func):
-        tests[func.__name__] = {"doc": func.__doc__, "run": func}
+    def __call__(self, func):
+        self.all[func.__name__] = {"doc": func.__doc__, "run": func}
         return func
-    testRegistrar.all = tests
-    return testRegistrar
 
-test = makeTestRegistrar()
-
+test = TestRegistrar()
 
 # ---------------------------------- TESTY ------------------------------------
 
