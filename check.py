@@ -2,8 +2,12 @@
 
 # Skript ktorý sa spúšťa pri kompilácií zadaní a robí im sanity checking.
 #
-# Tento skript by default spustí všetky testy ktoré pozná (overridnuteľné
-# flagmi).
+# Po spustení tento skript najskôr zoberie veci na check a sparsuje ich. To sa
+# robí mimo testov lebo ak by sa zmenil formát súborov nech netreba všetky
+# testy prepísať. Potom sa spustia jednotlivé testy, ktoré dostanú path k
+# zadaniam (ak chcú checkovať súborovú štruktúru, filenames...), plaintexty
+# zadaní (ak chcú checkovať newlines, trailing whitespace...) a sparsované
+# zadania (ak chcú checkovať počty bodov, správnosť názvov úloh...)
 #
 # Test
 # ----
@@ -36,8 +40,9 @@
 import logging
 import argparse
 import sys
+import os
 
-logger = logging.getLogger('core')
+logger = logging.getLogger('checker')
 logger.setLevel(logging.WARNING)
 formatter = logging.Formatter('Kontrola zadaní - %(name)s - %(levelname)s - ' +
                               ' %(message)s')
@@ -55,6 +60,27 @@ class TestRegistrar():
         return func
 
 test = TestRegistrar()
+
+# --------------------------------- PARSER ------------------------------------
+
+
+class Task():
+    def __init__(self):
+        self.name = None
+        self.points = {}
+        self.author = None
+        self.proofread = None
+        self.task_text = None
+        pass
+
+
+def parseTask(task):
+    logger = logging.getLogger('checker.parser')
+    logger.warning('Not yet implemented!')
+    pass
+
+
+# -----------------------------------------------------------------------------
 
 # ---------------------------------- TESTY ------------------------------------
 
@@ -85,6 +111,12 @@ def print_tests():
 
 def execute(args, tests):
     logger.debug("Spustím tieto testy: %s", str(tests.keys()))
+    if args.path_to_tasks:
+        logger.debug("Spúšťam testy na zadaniach z '%s'",
+                     args.path_to_tasks[0])
+        if not os.path.isdir(args.path_to_tasks[0]):
+            logger.critical("folder '%s' nenájdený alebo nie je folder!",
+                            args.path_to_tasks[0])
 
 
 def main():
@@ -144,7 +176,7 @@ def main():
             del tests_to_run[tst_name]
         return execute(args, tests_to_run)
 
-    return 0
+    return execute(args, dict(test.all))
 
 if __name__ == "__main__":
     sys.exit(main())
