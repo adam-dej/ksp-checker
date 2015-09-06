@@ -37,10 +37,13 @@ import logging
 import argparse
 import sys
 
-logger = logging.getLogger('check')
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - ' +
+logger = logging.getLogger('core')
+logger.setLevel(logging.WARNING)
+formatter = logging.Formatter('Kontrola zadaní - %(name)s - %(levelname)s - ' +
                               ' %(message)s')
+stream_handler = logging.StreamHandler(sys.stderr)
+stream_handler.setFormatter(formatter)
+logger.addHandler(stream_handler)
 
 
 def makeTestRegistrar():
@@ -77,9 +80,13 @@ def dummyTest2():
 
 
 def print_tests():
-    for tst in test.all:
-        print(tst, " - ", test.all[tst]['doc'])
+    for tst_name, tst in test.all.items():
+        print(tst_name, " - ", tst['doc'])
         print()
+
+
+def execute(args, tests):
+    logger.debug("Spustím tieto testy: %s", str(tests.keys()))
 
 
 def main():
@@ -109,6 +116,35 @@ def main():
     if args.print_only:
         print_tests()
         return 0
+
+    if args.verbosity:
+        if args.verbosity == 1:
+            logger.setLevel(logging.INFO)
+        if args.verbosity > 1:
+            logger.setLevel(logging.DEBUG)
+
+    if args.runonly:
+        # Check či testy vôbec existujú
+        tests_to_run = dict()
+        for tst_name in args.runonly:
+            if tst_name not in test.all:
+                logger.critical("Bol requestnutý beh testu " + tst_name +
+                                ", ale ten neexistuje.")
+                return 1
+            tests_to_run[tst_name] = test.all[tst_name]
+        return execute(args, tests_to_run)
+
+    if args.skip:
+        # Ak nejaký test neexistuje a chceme ho skipnúť je to asi chyba / typo
+        # a test čo nemá by bežal. Umrime radšej.
+        tests_to_run = dict(test.all)
+        for tst_name in args.skip:
+            if tst_name not in test.all:
+                logger.critical("Bolo requestnuté skipnutie testu " +
+                                tst_name + ", ale tento neexistuje.")
+                return 1
+            del tests_to_run[tst_name]
+        return execute(args, tests_to_run)
 
     return 0
 
