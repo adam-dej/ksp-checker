@@ -19,6 +19,8 @@
 # v ostatných riadkoch (indentovaných 4mi medzerami) optionally test popíše
 # detailnejšie.
 #
+# Ak je test úspešný vráti None. Ak zlyhal, vráti string s popisom chyby.
+#
 # Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a
 # docstringom, o ostatné sa starať netreba :)
 #
@@ -61,6 +63,33 @@ class TestRegistrar():
         return func
 
 test = TestRegistrar()
+
+# ---------------------------------- TESTY ------------------------------------
+
+
+@test
+def taskFirstLetter(logger, path_to_tasks, path_to_solutions, path_to_inputs,
+                    tasks, solutions, inputs):
+    """Kontrola prvého písmenka úlohy.
+
+    Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne
+    písmenko."""
+    if tasks is None:
+        # Nedostali sme úlohy, nothing to do
+        return None
+
+    config = [{"range": range(1, 5), "letter": 'Z'},
+              {"range": range(5, 9), "letter": 'O'}]
+
+    for task in tasks:
+        for config_item in config:
+            if task.task_number in config_item["range"]:
+                if not task.task_name.startswith(config_item["letter"]):
+                    return ("Úloha číslo {0} nezačína " +
+                            "správnym písmenom!").format(task.task_filename)
+
+
+# -----------------------------------------------------------------------------
 
 # --------------------------------- PARSER ------------------------------------
 
@@ -138,33 +167,6 @@ class Task():
             self.parse()
 
         pass
-
-
-# -----------------------------------------------------------------------------
-
-# ---------------------------------- TESTY ------------------------------------
-
-
-@test
-def taskFirstLetter(logger, path_to_tasks, path_to_solutions, path_to_inputs,
-                    tasks, solutions, inputs):
-    """Kontrola prvého písmenka úlohy.
-
-    Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne
-    písmenko."""
-    if tasks is None:
-        # Nedostali sme úlohy, nothing to do
-        return None
-
-    config = [{"range": range(1, 5), "letter": 'Z'},
-              {"range": range(5, 9), "letter": 'O'}]
-
-    for task in tasks:
-        for config_item in config:
-            if task.task_number in config_item["range"]:
-                if not task.task_name.startswith(config_item["letter"]):
-                    return ("Úloha číslo {0} nezačína " +
-                            "správnym písmenom!").format(task.task_filename)
 
 
 # -----------------------------------------------------------------------------
