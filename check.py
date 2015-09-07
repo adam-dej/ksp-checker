@@ -19,9 +19,9 @@
 # v ostatných riadkoch (indentovaných 4mi medzerami) optionally test popíše
 # detailnejšie.
 #
-# Ak je test úspešný vráti None. Ak zlyhal, vráti list stringov so zoznamom
-# chýb. Ak je to možné, test má otestovať čo najviac vecí a nie zrúbať sa pri
-# prvej chybe.
+# Ak je test úspešný vráti None alebo prázdny list. Ak zlyhal, vráti list
+# stringov so zoznamom chýb. Ak je to možné, test má otestovať čo najviac vecí
+# a nie zrúbať sa pri prvej chybe.
 #
 # Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a
 # docstringom, o ostatné sa starať netreba :)
@@ -72,16 +72,18 @@ test = TestRegistrar()
 @test
 def taskComplete(logger, path_to_tasks, path_to_solutions, path_to_inputs,
                  tasks, solutions, inputs):
-    """Kontrola či úloha meno a autora"""
+    """Kontrola či úloha má meno a autora"""
     if tasks is None:
         # Nedostali sme úlohy, nothing to do
         return None
 
+    errors = []
     for task in tasks:
         if not task.task_name:
-            return ("Úloha {0} nemá meno!".format(task.task_filename))
+            errors.append("Úloha {0} nemá meno!".format(task.task_filename))
         if not task.task_author:
-            return ("Úloha {0} nemá autora!".format(task.task_filename))
+            errors.append("Úloha {0} nemá autora!".format(task.task_filename))
+    return errors
 
 
 @test
@@ -92,10 +94,12 @@ def taskProofreaded(logger, path_to_tasks, path_to_solutions, path_to_inputs,
         # Nedostali sme úlohy, nothing to do
         return None
 
+    errors = []
     for task in tasks:
         if not task.task_proofreader:
-            return ("Úloha {0} nie je sproofreadovaná!"
-                    .format(task.task_filename))
+            errors.append("Úloha {0} nie je sproofreadovaná!"
+                          .format(task.task_filename))
+    return errors
 
 
 @test
@@ -112,12 +116,14 @@ def taskFirstLetter(logger, path_to_tasks, path_to_solutions, path_to_inputs,
     config = [{"range": range(1, 5), "letter": 'Z'},
               {"range": range(5, 9), "letter": 'O'}]
 
+    errors = []
     for task in tasks:
         for config_item in config:
             if task.task_number in config_item["range"]:
                 if not task.task_name.startswith(config_item["letter"]):
-                    return ("Úloha {0} nezačína " +
-                            "správnym písmenom!").format(task.task_filename)
+                    errors.append("Úloha {0} nezačína správnym písmenom!"
+                                  .format(task.task_filename))
+    return errors
 
 
 @test
@@ -135,14 +141,16 @@ def taskCorrectPoints(logger, path_to_tasks, path_to_solutions, path_to_inputs,
               {"range": range(4, 6), "points": 15},
               {"range": range(6, 9), "points": 20}]
 
+    errors = []
     for task in tasks:
         for config_item in config:
             if task.task_number in config_item["range"]:
                 task_points = (task.task_points["bodypopis"] +
                                task.task_points["bodyprogram"])
                 if task_points != config_item["points"]:
-                    return ("Úloha {0} nemá správny súčet bodov!"
-                            .format(task.task_filename))
+                    errors.append("Úloha {0} nemá správny súčet bodov!"
+                                  .format(task.task_filename))
+    return errors
 
 # -----------------------------------------------------------------------------
 
@@ -259,11 +267,12 @@ def execute(args, tests):
     # Spustime testy
     for test_name, test in tests.items():
         logger.debug("Spúšťam test %s", test_name)
-        error = test["run"](logging.getLogger('checker.' + test_name),
-                            args.path_to_tasks, args.path_to_solutions,
-                            args.path_to_inputs, tasks, [], [])
-        if error is not None:
-            logger.error("Test %s ZLYHAL! (%s)", test_name, error)
+        errors = test["run"](logging.getLogger('checker.' + test_name),
+                             args.path_to_tasks, args.path_to_solutions,
+                             args.path_to_inputs, tasks, [], [])
+        if errors:
+            for error in errors:
+                logger.error("Test %s ZLYHAL! (%s)", test_name, error)
             results["failure"] += 1
         else:
             logger.info("Test %s OK :)", test_name)
