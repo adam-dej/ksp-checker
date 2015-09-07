@@ -46,6 +46,7 @@ import argparse
 import sys
 import os
 import re
+import copy
 
 logger = logging.getLogger('checker')
 logger.setLevel(logging.WARNING)
@@ -110,16 +111,15 @@ def taskFirstLetter(logger, test_data):
         # Nedostali sme úlohy, nothing to do
         return None
 
-    config = [{"range": range(1, 5), "letter": 'Z'},
-              {"range": range(5, 9), "letter": 'O'}]
+    config = []
+    config += ['Z']*4  # Prvé 4 úlohy majú začínať Z-tkom
+    config += ['O']*4  # Ďalšie 4 úlohy majú začínať O-čkom
 
     errors = []
     for task in test_data["tasks"]:
-        for config_item in config:
-            if task.task_number in config_item["range"]:
-                if not task.task_name.startswith(config_item["letter"]):
-                    errors.append("Úloha {0} nezačína správnym písmenom!"
-                                  .format(task.task_filename))
+        if not task.task_name.startswith(config[task.task_number-1]):
+            errors.append("Úloha {0} nezačína správnym písmenom!"
+                          .format(task.task_filename))
     return errors
 
 
@@ -133,19 +133,18 @@ def taskCorrectPoints(logger, test_data):
         # Nedostali sme úlohy, nothing to do
         return None
 
-    config = [{"range": range(1, 4), "points": 10},
-              {"range": range(4, 6), "points": 15},
-              {"range": range(6, 9), "points": 20}]
+    config = []
+    config += [10]*3  # Úlohy 1-3 10b
+    config += [15]*2  # Úlohy 4-5 15b
+    config += [20]*3  # Úlohy 6-8 20b
 
     errors = []
     for task in test_data["tasks"]:
-        for config_item in config:
-            if task.task_number in config_item["range"]:
-                task_points = (task.task_points["bodypopis"] +
-                               task.task_points["bodyprogram"])
-                if task_points != config_item["points"]:
-                    errors.append("Úloha {0} nemá správny súčet bodov!"
-                                  .format(task.task_filename))
+        task_points = (task.task_points["bodypopis"] +
+                       task.task_points["bodyprogram"])
+        if task_points != config[task.task_number-1]:
+            errors.append("Úloha {0} nemá správny súčet bodov!"
+                          .format(task.task_filename))
     return errors
 
 # -----------------------------------------------------------------------------
@@ -186,7 +185,7 @@ class Task():
             self.task_points["bodypopis"] = int(found_points.group(1))
             self.task_points["bodyprogram"] = int(found_points.group(2))
             logger.debug('Vyparsované body (%s) z príkladu %s',
-                         str(self.task_points), self.task_filename)
+                         self.task_points, self.task_filename)
         except (AttributeError, IndexError, ValueError):
             logger.warning('Nepodarilo sa vyprasovať body z príkladu %s',
                            self.task_filename)
@@ -238,7 +237,7 @@ def print_tests():
 
 
 def execute(args, tests):
-    logger.debug("Spustím tieto testy: %s", str(tests.keys()))
+    logger.debug("Spustím tieto testy: %s", tests.keys())
     tasks = []
 
     if args.path_to_tasks:
@@ -251,7 +250,7 @@ def execute(args, tests):
                             args.path_to_tasks[0])
         for task_filename in os.listdir(args.path_to_tasks[0]):
             task_filename = os.path.join(args.path_to_tasks[0], task_filename)
-            if not os.path.isdir(task_filename):
+            if os.path.isfile(task_filename):
                 logger.debug("Čítam zadanie %s", task_filename)
                 task_file = open(task_filename, 'r')
                 tasks.append(Task(task_filename, task_file.read()))
@@ -266,8 +265,10 @@ def execute(args, tests):
         # TODO add test data for solutions and inputs
         test_data = {"path_to_tasks": args.path_to_tasks,
                      "tasks": tasks}
+        # deepcopy lebo nechceme aby prišiel niekto, v teste zmenil test_data
+        # a tak rozbil všetky ostatné
         errors = test["run"](logging.getLogger('checker.' + test_name),
-                             test_data)
+                             copy.deepcopy(test_data))
         if errors:
             for error in errors:
                 logger.error("Test %s ZLYHAL! (%s)", test_name, error)
