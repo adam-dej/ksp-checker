@@ -70,6 +70,15 @@ class Task():
         logger = logging.getLogger('checker.parser')
         lines = self.task_plaintext.split('\n')
 
+        # Vyparsujeme číslo príkladu
+        fname = os.path.basename(self.task_filename)
+        try:
+            found_task_number = re.search('prikl([0-9]*)', fname).group(1)
+            self.task_number = int(found_task_number)
+        except (AttributeError, IndexError, ValueError):
+            logger.error('Súbor %s nie je valídne meno príkladu!',
+                         self.task_filename)
+
         # Vyparsujme meno príkladu
         try:
             # Regex ktoý chce matchnúť meno príkladu (po # a pred {} s bodmi)
@@ -120,6 +129,7 @@ class Task():
         self.task_filename = task_filename
 
         self.task_name = None
+        self.task_number = None
         self.task_points = {}
         self.task_author = None
         self.task_proofreader = None
