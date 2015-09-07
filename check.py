@@ -70,15 +70,14 @@ test = TestRegistrar()
 
 
 @test
-def taskComplete(logger, path_to_tasks, path_to_solutions, path_to_inputs,
-                 tasks, solutions, inputs):
+def taskComplete(logger, test_data):
     """Kontrola či úloha má meno a autora"""
-    if tasks is None:
+    if not test_data["tasks"]:
         # Nedostali sme úlohy, nothing to do
         return None
 
     errors = []
-    for task in tasks:
+    for task in test_data["tasks"]:
         if not task.task_name:
             errors.append("Úloha {0} nemá meno!".format(task.task_filename))
         if not task.task_author:
@@ -87,15 +86,14 @@ def taskComplete(logger, path_to_tasks, path_to_solutions, path_to_inputs,
 
 
 @test
-def taskProofreaded(logger, path_to_tasks, path_to_solutions, path_to_inputs,
-                    tasks, solutions, inputs):
+def taskProofreaded(logger, test_data):
     """Kontrola či je úloha sproofreadovaná"""
-    if tasks is None:
+    if not test_data["tasks"]:
         # Nedostali sme úlohy, nothing to do
         return None
 
     errors = []
-    for task in tasks:
+    for task in test_data["tasks"]:
         if not task.task_proofreader:
             errors.append("Úloha {0} nie je sproofreadovaná!"
                           .format(task.task_filename))
@@ -103,13 +101,12 @@ def taskProofreaded(logger, path_to_tasks, path_to_solutions, path_to_inputs,
 
 
 @test
-def taskFirstLetter(logger, path_to_tasks, path_to_solutions, path_to_inputs,
-                    tasks, solutions, inputs):
+def taskFirstLetter(logger, test_data):
     """Kontrola prvého písmenka úlohy.
 
     Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne
     písmenko."""
-    if tasks is None:
+    if not test_data["tasks"]:
         # Nedostali sme úlohy, nothing to do
         return None
 
@@ -117,7 +114,7 @@ def taskFirstLetter(logger, path_to_tasks, path_to_solutions, path_to_inputs,
               {"range": range(5, 9), "letter": 'O'}]
 
     errors = []
-    for task in tasks:
+    for task in test_data["tasks"]:
         for config_item in config:
             if task.task_number in config_item["range"]:
                 if not task.task_name.startswith(config_item["letter"]):
@@ -127,13 +124,12 @@ def taskFirstLetter(logger, path_to_tasks, path_to_solutions, path_to_inputs,
 
 
 @test
-def taskCorrectPoints(logger, path_to_tasks, path_to_solutions, path_to_inputs,
-                      tasks, solutions, inputs):
+def taskCorrectPoints(logger, test_data):
     """Kontrola správneho súčtu bodov.
 
     Tento test zlyhá ak úlohy nemajú správne súčty bodov. Správne súčty bodov
     sú 10 za príklady 1-3, 15 za 4-5 a 20 za 6-8."""
-    if tasks is None:
+    if not test_data["tasks"]:
         # Nedostali sme úlohy, nothing to do
         return None
 
@@ -142,7 +138,7 @@ def taskCorrectPoints(logger, path_to_tasks, path_to_solutions, path_to_inputs,
               {"range": range(6, 9), "points": 20}]
 
     errors = []
-    for task in tasks:
+    for task in test_data["tasks"]:
         for config_item in config:
             if task.task_number in config_item["range"]:
                 task_points = (task.task_points["bodypopis"] +
@@ -267,9 +263,11 @@ def execute(args, tests):
     # Spustime testy
     for test_name, test in tests.items():
         logger.debug("Spúšťam test %s", test_name)
+        # TODO add test data for solutions and inputs
+        test_data = {"path_to_tasks": args.path_to_tasks,
+                     "tasks": tasks}
         errors = test["run"](logging.getLogger('checker.' + test_name),
-                             args.path_to_tasks, args.path_to_solutions,
-                             args.path_to_inputs, tasks, [], [])
+                             test_data)
         if errors:
             for error in errors:
                 logger.error("Test %s ZLYHAL! (%s)", test_name, error)
