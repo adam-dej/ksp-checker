@@ -19,8 +19,8 @@
 # v ostatných riadkoch (indentovaných 4mi medzerami) optionally test popíše
 # detailnejšie.
 #
-# Test hlási chyby a iné veci loggeru ktorý mu je daný. Ak zbehol úspešne
-# vráti True, ak neúspešne vráti False.
+# Test hlási chyby a iné veci loggeru ktorý mu je daný. Vráti jedno z
+# TestResult.{OK, SKIP, WARNING, ERROR}
 #
 # Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a
 # docstringom, o ostatné sa starať netreba :)
@@ -46,6 +46,7 @@ import sys
 import os
 import re
 import copy
+from enum import Enum
 
 logger = logging.getLogger('checker')
 logger.setLevel(logging.WARNING)
@@ -66,6 +67,13 @@ class TestRegistrar():
 
 test = TestRegistrar()
 
+
+class TestResult(Enum):
+    OK = 0
+    SKIP = 1
+    WARNING = 2
+    ERROR = 3
+
 # ---------------------------------- TESTY ------------------------------------
 
 
@@ -74,7 +82,7 @@ def taskComplete(logger, test_data):
     """Kontrola či úloha má meno a autora"""
     if not test_data["tasks"]:
         logger.info('Nemám path k úloham, skippujem sa...')
-        return True
+        return TestResult.SKIP
 
     success = True
     for task in test_data["tasks"]:
@@ -84,7 +92,7 @@ def taskComplete(logger, test_data):
         if not task.task_author:
             logger.error("Úloha %s nemá autora!", task.task_filename)
             success = False
-    return success
+    return TestResult.OK if success else TestResult.ERROR
 
 
 @test
@@ -92,15 +100,15 @@ def taskProofreaded(logger, test_data):
     """Kontrola či je úloha sproofreadovaná"""
     if not test_data["tasks"]:
         logger.info('Nemám path k úloham, skippujem sa...')
-        return True
+        return TestResult.SKIP
 
     success = True
     for task in test_data["tasks"]:
         if not task.task_proofreader:
-            logger.error("Úloha {0} nie je sproofreadovaná!"
-                         .format(task.task_filename))
+            logger.warning("Úloha {0} nie je sproofreadovaná!"
+                           .format(task.task_filename))
             success = False
-    return success
+    return TestResult.OK if success else TestResult.WARNING
 
 
 @test
@@ -111,7 +119,7 @@ def taskFirstLetter(logger, test_data):
     písmenko."""
     if not test_data["tasks"]:
         logger.info('Nemám path k úloham, skippujem sa...')
-        return True
+        return TestResult.SKIP
 
     config = []
     config += ['Z']*4  # Prvé 4 úlohy majú začínať Z-tkom
@@ -123,7 +131,7 @@ def taskFirstLetter(logger, test_data):
             logger.error("Úloha {0} nezačína správnym písmenom!"
                          .format(task.task_filename))
             success = False
-    return success
+    return TestResult.OK if success else TestResult.ERROR
 
 
 @test
@@ -134,7 +142,7 @@ def taskCorrectPoints(logger, test_data):
     sú 10 za príklady 1-3, 15 za 4-5 a 20 za 6-8."""
     if not test_data["tasks"]:
         logger.info('Nemám path k úloham, skippujem sa...')
-        return True
+        return TestResult.SKIP
 
     config = []
     config += [10]*3  # Úlohy 1-3 10b
@@ -149,7 +157,7 @@ def taskCorrectPoints(logger, test_data):
             logger.error("Úloha {0} nemá správny súčet bodov!"
                          .format(task.task_filename))
             success = False
-    return success
+    return TestResult.OK if success else TestResult.ERROR
 
 # -----------------------------------------------------------------------------
 
@@ -261,7 +269,10 @@ def execute(args, tests):
 
     # TODO okrem iného chceme loadnuť a sparsovať vstupy a vzoráky ešte
 
-    results = {"success": 0, "warning": 0, "failure": 0}
+    results = {TestResult.SKIP: 0,
+               TestResult.OK: 0,
+               TestResult.WARNING: 0,
+               TestResult.ERROR: 0}
 
     # Spustime testy
     for test_name, test in tests.items():
@@ -271,25 +282,36 @@ def execute(args, tests):
                      "tasks": tasks}
         # deepcopy lebo nechceme aby prišiel niekto, v teste zmenil test_data
         # a tak rozbil všetky ostatné
-        success = test["run"](logging.getLogger('checker.' + test_name),
-                              copy.deepcopy(test_data))
-        if success:
-            logger.info("Test %s je ok.", test_name)
-            results["success"] += 1
-        else:
-            logger.error("Test %s ZLYHAL!", test_name)
-            results["failure"] += 1
+        status = test["run"](logging.getLogger('checker.' + test_name),
+                             copy.deepcopy(test_data))
+        results[status] += 1
 
-    if results["failure"] != 0:
-        logger.critical("Celé zle. Zlyhalo %i testov!", results["failure"])
+        if status == TestResult.ERROR:
+            logger.error("Test %s ZLYHAL!", test_name)
+        elif status == TestResult.WARNING:
+            logger.warning("Test %s skončil s varovaním!", test_name)
+        elif status == TestResult.OK:
+            logger.info("Test %s je ok.", test_name)
+        elif status == TestResult.SKIP:
+            logger.debug("Test %s skippol sám seba", test_name)
+
+    logger.info("Done\n\n")
+
+    logger.info("Výsledky: OK      - %i", results[TestResult.OK])
+    logger.info("          SKIP    - %i", results[TestResult.SKIP])
+    logger.info("          WARNING - %i", results[TestResult.WARNING])
+    logger.info("          ERROR   - %i", results[TestResult.ERROR])
+
+    if results[TestResult.ERROR] != 0:
+        logger.critical("Celé zle. Zlyhalo %i testov!",
+                        results[TestResult.ERROR])
         return 1
-    elif results["warning"] != 0:
-        logger.warning("Testy síce zbehli, ale bolo %i warningov!",
-                       results["warning"])
+    elif results[TestResult.WARNING] != 0:
+        logger.warning("Testy zbehli ok, ale bolo %i warningov!",
+                       results[TestResult.WARNING])
         return 0
     else:
-        logger.info("Dobrá práca. Všetkých %i testov bolo úspešných.",
-                    results["success"])
+        logger.info("Testy zbehli ok. Dobrá práca.")
         return 0
 
 
