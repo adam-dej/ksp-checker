@@ -19,7 +19,9 @@
 # v ostatných riadkoch (indentovaných 4mi medzerami) optionally test popíše
 # detailnejšie.
 #
-# Ak je test úspešný vráti None. Ak zlyhal, vráti string s popisom chyby.
+# Ak je test úspešný vráti None. Ak zlyhal, vráti list stringov so zoznamom
+# chýb. Ak je to možné, test má otestovať čo najviac vecí a nie zrúbať sa pri
+# prvej chybe.
 #
 # Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a
 # docstringom, o ostatné sa starať netreba :)
@@ -68,6 +70,35 @@ test = TestRegistrar()
 
 
 @test
+def taskComplete(logger, path_to_tasks, path_to_solutions, path_to_inputs,
+                 tasks, solutions, inputs):
+    """Kontrola či úloha meno a autora"""
+    if tasks is None:
+        # Nedostali sme úlohy, nothing to do
+        return None
+
+    for task in tasks:
+        if not task.task_name:
+            return ("Úloha {0} nemá meno!".format(task.task_filename))
+        if not task.task_author:
+            return ("Úloha {0} nemá autora!".format(task.task_filename))
+
+
+@test
+def taskProofreaded(logger, path_to_tasks, path_to_solutions, path_to_inputs,
+                    tasks, solutions, inputs):
+    """Kontrola či je úloha sproofreadovaná"""
+    if tasks is None:
+        # Nedostali sme úlohy, nothing to do
+        return None
+
+    for task in tasks:
+        if not task.task_proofreader:
+            return ("Úloha {0} nie je sproofreadovaná!"
+                    .format(task.task_filename))
+
+
+@test
 def taskFirstLetter(logger, path_to_tasks, path_to_solutions, path_to_inputs,
                     tasks, solutions, inputs):
     """Kontrola prvého písmenka úlohy.
@@ -85,9 +116,33 @@ def taskFirstLetter(logger, path_to_tasks, path_to_solutions, path_to_inputs,
         for config_item in config:
             if task.task_number in config_item["range"]:
                 if not task.task_name.startswith(config_item["letter"]):
-                    return ("Úloha číslo {0} nezačína " +
+                    return ("Úloha {0} nezačína " +
                             "správnym písmenom!").format(task.task_filename)
 
+
+@test
+def taskCorrectPoints(logger, path_to_tasks, path_to_solutions, path_to_inputs,
+                      tasks, solutions, inputs):
+    """Kontrola správneho súčtu bodov.
+
+    Tento test zlyhá ak úlohy nemajú správne súčty bodov. Správne súčty bodov
+    sú 10 za príklady 1-3, 15 za 4-5 a 20 za 6-8."""
+    if tasks is None:
+        # Nedostali sme úlohy, nothing to do
+        return None
+
+    config = [{"range": range(1, 4), "points": 10},
+              {"range": range(4, 6), "points": 15},
+              {"range": range(6, 9), "points": 20}]
+
+    for task in tasks:
+        for config_item in config:
+            if task.task_number in config_item["range"]:
+                task_points = (task.task_points["bodypopis"] +
+                               task.task_points["bodyprogram"])
+                if task_points != config_item["points"]:
+                    return ("Úloha {0} nemá správny súčet bodov!"
+                            .format(task.task_filename))
 
 # -----------------------------------------------------------------------------
 
