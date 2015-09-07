@@ -146,20 +146,25 @@ class Task():
 
 
 @test
-def dummyTest1(logger, path_to_tasks, path_to_solutions, path_to_inputs,
-               tasks, solutions, inputs):
-    """Test testu 1.
+def taskFirstLetter(logger, path_to_tasks, path_to_solutions, path_to_inputs,
+                    tasks, solutions, inputs):
+    """Kontrola prvého písmenka úlohy.
 
-    Tento test testuje schopnosť pridávania testov pomocou dekorátorov.
-    A toto je dlhááá dokumentáci ak nemu."""
-    pass
+    Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne
+    písmenko."""
+    if tasks is None:
+        # Nedostali sme úlohy, nothing to do
+        return None
 
+    config = [{"range": range(1, 5), "letter": 'Z'},
+              {"range": range(5, 9), "letter": 'O'}]
 
-@test
-def dummyTest2(logger, path_to_tasks, path_to_solutions, path_to_inputs,
-               tasks, solutions, inputs):
-    """Hlúpy ničohoneschopný test na pokus 2"""
-    pass
+    for task in tasks:
+        for config_item in config:
+            if task.task_number in config_item["range"]:
+                if not task.task_name.startswith(config_item["letter"]):
+                    return ("Úloha číslo {0} nezačína " +
+                            "správnym písmenom!").format(task.task_filename)
 
 
 # -----------------------------------------------------------------------------
@@ -195,9 +200,13 @@ def execute(args, tests):
     # Spustime testy
     for test_name, test in tests.items():
         logger.debug("Spúšťam test %s", test_name)
-        test["run"](logging.getLogger('checker.' + test_name),
-                    args.path_to_tasks, args.path_to_solutions,
-                    args.path_to_inputs, tasks, [], [])
+        error = test["run"](logging.getLogger('checker.' + test_name),
+                            args.path_to_tasks, args.path_to_solutions,
+                            args.path_to_inputs, tasks, [], [])
+        if error is not None:
+            logger.error("Test %s ZLYHAL! (%s)", test_name, error)
+        else:
+            logger.info("Test %s OK :)", test_name)
 
 
 def main():
