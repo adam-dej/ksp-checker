@@ -65,19 +65,21 @@ test = TestRegistrar()
 
 
 class Task():
-    def __init__(self):
-        self.name = None
-        self.points = {}
-        self.author = None
-        self.proofread = None
-        self.task_text = None
+    def parse(self):
+        logger = logging.getLogger('checker.parser')
+        logger.debug("Parsujem zadanie")
+
+    def __init__(self, task_text=None):
+        self.task_plaintext = task_text
+
+        if self.task_plaintext is not None:
+            self.parse()
+
+        self.task_name = None
+        self.task_points = {}
+        self.task_author = None
+        self.task_proofread = None
         pass
-
-
-def parseTask(task):
-    logger = logging.getLogger('checker.parser')
-    logger.warning('Not yet implemented!')
-    pass
 
 
 # -----------------------------------------------------------------------------
@@ -112,11 +114,20 @@ def print_tests():
 def execute(args, tests):
     logger.debug("Spustím tieto testy: %s", str(tests.keys()))
     if args.path_to_tasks:
+        # Bola nám daná cesta k zadaniam, dajme ju testom. Ale najskôr tieto
+        # zadania loadnime a sparsujme
         logger.debug("Spúšťam testy na zadaniach z '%s'",
                      args.path_to_tasks[0])
+        tasks = []
         if not os.path.isdir(args.path_to_tasks[0]):
             logger.critical("folder '%s' nenájdený alebo nie je folder!",
                             args.path_to_tasks[0])
+        for task_filename in os.listdir(args.path_to_tasks[0]):
+            task_filename = os.path.join(args.path_to_tasks[0], task_filename)
+            if not os.path.isdir(task_filename):
+                logger.debug("Čítam zadanie %s", task_filename)
+                task_file = open(task_filename, 'r')
+                tasks.append(Task(task_file.read()))
 
 
 def main():
