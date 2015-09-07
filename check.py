@@ -19,9 +19,8 @@
 # v ostatných riadkoch (indentovaných 4mi medzerami) optionally test popíše
 # detailnejšie.
 #
-# Ak je test úspešný vráti None alebo prázdny list. Ak zlyhal, vráti list
-# stringov so zoznamom chýb. Ak je to možné, test má otestovať čo najviac vecí
-# a nie zrúbať sa pri prvej chybe.
+# Test hlási chyby a iné veci loggeru ktorý mu je daný. Ak zbehol úspešne
+# vráti True, ak neúspešne vráti False.
 #
 # Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a
 # docstringom, o ostatné sa starať netreba :)
@@ -74,31 +73,34 @@ test = TestRegistrar()
 def taskComplete(logger, test_data):
     """Kontrola či úloha má meno a autora"""
     if not test_data["tasks"]:
-        # Nedostali sme úlohy, nothing to do
-        return None
+        logger.info('Nemám path k úloham, skippujem sa...')
+        return True
 
-    errors = []
+    success = True
     for task in test_data["tasks"]:
         if not task.task_name:
-            errors.append("Úloha {0} nemá meno!".format(task.task_filename))
+            logger.error("Úloha %s nemá meno!", task.task_filename)
+            success = False
         if not task.task_author:
-            errors.append("Úloha {0} nemá autora!".format(task.task_filename))
-    return errors
+            logger.error("Úloha %s nemá autora!", task.task_filename)
+            success = False
+    return success
 
 
 @test
 def taskProofreaded(logger, test_data):
     """Kontrola či je úloha sproofreadovaná"""
     if not test_data["tasks"]:
-        # Nedostali sme úlohy, nothing to do
-        return None
+        logger.info('Nemám path k úloham, skippujem sa...')
+        return True
 
-    errors = []
+    success = True
     for task in test_data["tasks"]:
         if not task.task_proofreader:
-            errors.append("Úloha {0} nie je sproofreadovaná!"
-                          .format(task.task_filename))
-    return errors
+            logger.error("Úloha {0} nie je sproofreadovaná!"
+                         .format(task.task_filename))
+            success = False
+    return success
 
 
 @test
@@ -108,19 +110,20 @@ def taskFirstLetter(logger, test_data):
     Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne
     písmenko."""
     if not test_data["tasks"]:
-        # Nedostali sme úlohy, nothing to do
-        return None
+        logger.info('Nemám path k úloham, skippujem sa...')
+        return True
 
     config = []
     config += ['Z']*4  # Prvé 4 úlohy majú začínať Z-tkom
     config += ['O']*4  # Ďalšie 4 úlohy majú začínať O-čkom
 
-    errors = []
+    success = True
     for task in test_data["tasks"]:
         if not task.task_name.startswith(config[task.task_number-1]):
-            errors.append("Úloha {0} nezačína správnym písmenom!"
-                          .format(task.task_filename))
-    return errors
+            logger.error("Úloha {0} nezačína správnym písmenom!"
+                         .format(task.task_filename))
+            success = False
+    return success
 
 
 @test
@@ -130,22 +133,23 @@ def taskCorrectPoints(logger, test_data):
     Tento test zlyhá ak úlohy nemajú správne súčty bodov. Správne súčty bodov
     sú 10 za príklady 1-3, 15 za 4-5 a 20 za 6-8."""
     if not test_data["tasks"]:
-        # Nedostali sme úlohy, nothing to do
-        return None
+        logger.info('Nemám path k úloham, skippujem sa...')
+        return True
 
     config = []
     config += [10]*3  # Úlohy 1-3 10b
     config += [15]*2  # Úlohy 4-5 15b
     config += [20]*3  # Úlohy 6-8 20b
 
-    errors = []
+    success = True
     for task in test_data["tasks"]:
         task_points = (task.task_points["bodypopis"] +
                        task.task_points["bodyprogram"])
         if task_points != config[task.task_number-1]:
-            errors.append("Úloha {0} nemá správny súčet bodov!"
-                          .format(task.task_filename))
-    return errors
+            logger.error("Úloha {0} nemá správny súčet bodov!"
+                         .format(task.task_filename))
+            success = False
+    return success
 
 # -----------------------------------------------------------------------------
 
@@ -267,15 +271,14 @@ def execute(args, tests):
                      "tasks": tasks}
         # deepcopy lebo nechceme aby prišiel niekto, v teste zmenil test_data
         # a tak rozbil všetky ostatné
-        errors = test["run"](logging.getLogger('checker.' + test_name),
-                             copy.deepcopy(test_data))
-        if errors:
-            for error in errors:
-                logger.error("Test %s ZLYHAL! (%s)", test_name, error)
-            results["failure"] += 1
-        else:
-            logger.info("Test %s OK :)", test_name)
+        success = test["run"](logging.getLogger('checker.' + test_name),
+                              copy.deepcopy(test_data))
+        if success:
+            logger.info("Test %s je ok.", test_name)
             results["success"] += 1
+        else:
+            logger.error("Test %s ZLYHAL!", test_name)
+            results["failure"] += 1
 
     if results["failure"] != 0:
         logger.critical("Celé zle. Zlyhalo %i testov!", results["failure"])
