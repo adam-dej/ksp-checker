@@ -41,6 +41,7 @@ import logging
 import argparse
 import sys
 import os
+import re
 
 logger = logging.getLogger('checker')
 logger.setLevel(logging.WARNING)
@@ -67,18 +68,65 @@ test = TestRegistrar()
 class Task():
     def parse(self):
         logger = logging.getLogger('checker.parser')
-        logger.debug("Parsujem zadanie")
+        lines = self.task_plaintext.split('\n')
 
-    def __init__(self, task_text=None):
+        # Vyparsujme meno príkladu
+        try:
+            # Regex ktoý chce matchnúť meno príkladu (po # a pred {} s bodmi)
+            found_task_name = re.search('\.?#([^{}]*)', lines[0]).group(1)
+            self.task_name = found_task_name.strip()
+            logger.debug('Vyparsované meno príkladu (%s) z %s', self.task_name,
+                         self.task_filename)
+        except (AttributeError, IndexError):
+            logger.warning('Nepodarilo sa vyparsovať meno príkladu z %s',
+                           self.task_filename)
+
+        # Vyparsujeme body za príklad
+        try:
+            # Regex ktorý chce matchnúť čísleka s bodmi
+            found_points = re.search('{bodypopis=([0-9]*) bodyprogram=' +
+                                     '([0-9]*)}', lines[0])
+            self.task_points["bodypopis"] = int(found_points.group(1))
+            self.task_points["bodyprogram"] = int(found_points.group(2))
+            logger.debug('Vyparsované body (%s) z príkladu %s',
+                         str(self.task_points), self.task_filename)
+        except (AttributeError, IndexError, ValueError):
+            logger.warning('Nepodarilo sa vyprasovať body z príkladu %s',
+                           self.task_filename)
+
+        for line in lines:
+            # Vyparsujeme autora
+            found_author = re.search('%by (.*)', line)
+            if found_author:
+                if self.task_author is not None:
+                    logger.warning('Úloha %s má údajne viac autorov!',
+                                   self.task_filename)
+                self.task_author = found_author.group(1)
+                logger.debug('Nájdený autor (%s) úlohy %s', self.task_author,
+                             self.task_filename)
+
+            # Vyparsujeme proofreadera
+            found_proofreader = re.search('%proofread (.*)', line)
+            if found_proofreader:
+                if self.task_proofreader is not None:
+                    logger.warning('Úloha %s má údajne viac proofreaderov!',
+                                   self.task_filename)
+                self.task_proofreader = found_proofreader.group(1)
+                logger.debug('Nájdený proofreader (%s) úlohy %s',
+                             self.task_proofreader, self.task_filename)
+
+    def __init__(self, task_filename=None, task_text=None):
         self.task_plaintext = task_text
-
-        if self.task_plaintext is not None:
-            self.parse()
+        self.task_filename = task_filename
 
         self.task_name = None
         self.task_points = {}
         self.task_author = None
-        self.task_proofread = None
+        self.task_proofreader = None
+
+        if self.task_plaintext is not None:
+            self.parse()
+
         pass
 
 
@@ -88,7 +136,8 @@ class Task():
 
 
 @test
-def dummyTest1():
+def dummyTest1(logger, path_to_tasks, path_to_solutions, path_to_inputs,
+               tasks, solutions, inputs):
     """Test testu 1.
 
     Tento test testuje schopnosť pridávania testov pomocou dekorátorov.
@@ -97,7 +146,8 @@ def dummyTest1():
 
 
 @test
-def dummyTest2():
+def dummyTest2(logger, path_to_tasks, path_to_solutions, path_to_inputs,
+               tasks, solutions, inputs):
     """Hlúpy ničohoneschopný test na pokus 2"""
     pass
 
@@ -113,12 +163,13 @@ def print_tests():
 
 def execute(args, tests):
     logger.debug("Spustím tieto testy: %s", str(tests.keys()))
+    tasks = []
+
     if args.path_to_tasks:
         # Bola nám daná cesta k zadaniam, dajme ju testom. Ale najskôr tieto
         # zadania loadnime a sparsujme
         logger.debug("Spúšťam testy na zadaniach z '%s'",
                      args.path_to_tasks[0])
-        tasks = []
         if not os.path.isdir(args.path_to_tasks[0]):
             logger.critical("folder '%s' nenájdený alebo nie je folder!",
                             args.path_to_tasks[0])
@@ -127,7 +178,16 @@ def execute(args, tests):
             if not os.path.isdir(task_filename):
                 logger.debug("Čítam zadanie %s", task_filename)
                 task_file = open(task_filename, 'r')
-                tasks.append(Task(task_file.read()))
+                tasks.append(Task(task_filename, task_file.read()))
+
+    # TODO okrem iného chceme loadnuť a sparsovať vstupy a vzoráky ešte
+
+    # Spustime testy
+    for test_name, test in tests.items():
+        logger.debug("Spúšťam test %s", test_name)
+        test["run"](logging.getLogger('checker.' + test_name),
+                    args.path_to_tasks, args.path_to_solutions,
+                    args.path_to_inputs, tasks, [], [])
 
 
 def main():
