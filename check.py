@@ -197,6 +197,8 @@ def execute(args, tests):
 
     # TODO okrem iného chceme loadnuť a sparsovať vstupy a vzoráky ešte
 
+    results = {"success": 0, "warning": 0, "failure": 0}
+
     # Spustime testy
     for test_name, test in tests.items():
         logger.debug("Spúšťam test %s", test_name)
@@ -205,8 +207,22 @@ def execute(args, tests):
                             args.path_to_inputs, tasks, [], [])
         if error is not None:
             logger.error("Test %s ZLYHAL! (%s)", test_name, error)
+            results["failure"] += 1
         else:
             logger.info("Test %s OK :)", test_name)
+            results["success"] += 1
+
+    if results["failure"] != 0:
+        logger.critical("Celé zle. Zlyhalo %i testov!", results["failure"])
+        return 1
+    elif results["warning"] != 0:
+        logger.warning("Testy síce zbehli, ale bolo %i warningov!",
+                       results["warning"])
+        return 0
+    else:
+        logger.info("Dobrá práca. Všetkých %i testov bolo úspešných.",
+                    results["success"])
+        return 0
 
 
 def main():
