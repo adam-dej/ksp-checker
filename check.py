@@ -41,6 +41,7 @@ import sys
 import os
 import re
 import copy
+import glob
 from enum import Enum
 
 logger = logging.getLogger('checker')
@@ -96,7 +97,7 @@ class IssueLogger():
 def taskComplete(logger, test_data):
     """Kontrola či úloha má meno a autora"""
     if not test_data["tasks"]:
-        logger.logMessage(logging.INFO, 'Nemám path k úloham, skippujem sa...')
+        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
         return TestResult.SKIP
 
     success = True
@@ -114,7 +115,7 @@ def taskComplete(logger, test_data):
 def taskProofreaded(logger, test_data):
     """Kontrola či je úloha sproofreadovaná"""
     if not test_data["tasks"]:
-        logger.logMessage(logging.INFO, 'Nemám path k úloham, skippujem sa...')
+        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
         return TestResult.SKIP
 
     success = True
@@ -132,7 +133,7 @@ def taskFirstLetter(logger, test_data):
 
     Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne písmenko."""
     if not test_data["tasks"]:
-        logger.logMessage(logging.INFO, 'Nemám path k úloham, skippujem sa...')
+        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
         return TestResult.SKIP
 
     config = []
@@ -157,7 +158,7 @@ def taskCorrectPoints(logger, test_data):
     Tento test zlyhá ak úlohy nemajú správne súčty bodov. Správne súčty bodov sú 10 za príklady
     1-3, 15 za 4-5 a 20 za 6-8."""
     if not test_data["tasks"]:
-        logger.logMessage(logging.INFO, 'Nemám path k úloham, skippujem sa...')
+        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
         return TestResult.SKIP
 
     config = []
@@ -274,11 +275,11 @@ def print_tests():
 
 
 def parse_tasks(path_to_tasks):
+    VALID_TASK_FILE_NAME = 'prikl*.md'
     tasks = []
     if not os.path.isdir(path_to_tasks):
         logger.critical("folder '%s' nenájdený alebo nie je folder!", path_to_tasks)
-    for task_filename in os.listdir(path_to_tasks):
-        task_filename = os.path.join(path_to_tasks, task_filename)
+    for task_filename in glob.iglob(os.path.join(path_to_tasks, VALID_TASK_FILE_NAME)):
         if os.path.isfile(task_filename):
             logger.debug("Čítam zadanie %s", task_filename)
             task_file = open(task_filename, 'r')
