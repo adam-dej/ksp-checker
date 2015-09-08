@@ -2,43 +2,38 @@
 
 # Skript ktorý sa spúšťa pri kompilácií zadaní a robí im sanity checking.
 #
-# Po spustení tento skript najskôr zoberie veci na check a sparsuje ich. To sa
-# robí mimo testov lebo ak by sa zmenil formát súborov nech netreba všetky
-# testy prepísať. Potom sa spustia jednotlivé testy, ktoré dostanú path k
-# zadaniam (ak chcú checkovať súborovú štruktúru, filenames...), plaintexty
-# zadaní (ak chcú checkovať newlines, trailing whitespace...) a sparsované
-# zadania (ak chcú checkovať počty bodov, správnosť názvov úloh...)
+# Po spustení tento skript najskôr zoberie veci na check a sparsuje ich. To sa robí mimo testov lebo
+# ak by sa zmenil formát súborov nech netreba všetky testy prepísať. Potom sa spustia jednotlivé
+# testy, ktoré dostanú path k zadaniam (ak chcú checkovať súborovú štruktúru, filenames...),
+# plaintexty zadaní (ak chcú checkovať newlines, trailing whitespace...) a sparsované zadania (ak
+# chcú checkovať počty bodov, správnosť názvov úloh...)
 #
 # Test
 # ----
 #
-# Test je obyčajná funkcia v sekcii skriptu "TESTY", ktorá je dekorovaná
-# @test dekorátorom. Meno tejto funkcie je názov testu (bude sa používať v
-# argumentoch, ako chybová hláška keď test zlyhá a tak.) Test musí obsahovať
-# neprázdny docstring ktorý v prvom riadku pár slovami popíše čo test robí a
-# v ostatných riadkoch (indentovaných 4mi medzerami) optionally test popíše
-# detailnejšie.
+# Test je obyčajná funkcia v sekcii skriptu "TESTY", ktorá je dekorovaná @test dekorátorom. Meno
+# tejto funkcie je názov testu (bude sa používať v argumentoch, ako chybová hláška keď test zlyhá a
+# tak.) Test musí obsahovať neprázdny docstring ktorý v prvom riadku pár slovami popíše čo test robí
+# a v ostatných riadkoch (indentovaných 4mi medzerami) optionally test popíše detailnejšie.
 #
-# Test hlási chyby a iné veci loggeru ktorý mu je daný. Vráti jedno z
-# TestResult.{OK, SKIP, WARNING, ERROR}
+# Test hlási chyby a iné veci loggeru ktorý mu je daný. Vráti jedno z TestResult.{OK, SKIP, WARNING,
+# ERROR}
 #
-# Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a
-# docstringom, o ostatné sa starať netreba :)
+# Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a docstringom, o ostatné
+# sa starať netreba :)
 #
 # Čo týmto skriptom básnik myslel...
 # ----------------------------------
 #
 # Alebo náhodné poznámky pre náhodných maintainerov.
 #
-#  - Dodržujte PEP-8
+#  - Dodržujte PEP-8 (okrem max dĺžky riadku, to nech je 100)
 #  - Snažte sa o konzistentný coding style
-#  - Nakoľko sa meno fcie testu používa v chybovej hláške o zlyhaní a tak,
-#    mená majú dávať zmysel (prosím, žiadne T_PAAMAYIM_NEKUDOTAYIM ;) )
-#  - Unix-like: "No news are good news"
-#    Nevypisujte hlúposti ak nie ste verbose.
-#  - Tento script je zatiaľ iba v zadaniach kde sa môže správať ako chce.
-#    Eventuálne ale bude jeden build step keď sa budú automaticky v CI buildiť
-#    zadania, preto je napísaný tak ako je.
+#  - Nakoľko sa meno fcie testu používa v chybovej hláške o zlyhaní a tak, mená majú dávať zmysel
+#    (prosím, žiadne T_PAAMAYIM_NEKUDOTAYIM ;) )
+#  - Unix-like: "No news are good news". Nevypisujte hlúposti ak nie ste verbose.
+#  - Tento script je zatiaľ iba v zadaniach kde sa môže správať ako chce. Eventuálne ale bude jeden
+#    build step keď sa budú automaticky v CI buildiť zadania, preto je napísaný tak ako je.
 
 import logging
 import argparse
@@ -50,8 +45,7 @@ from enum import Enum
 
 logger = logging.getLogger('checker')
 logger.setLevel(logging.WARNING)
-formatter = logging.Formatter('Kontrola zadaní - %(name)s - %(levelname)s - ' +
-                              ' %(message)s')
+formatter = logging.Formatter('Kontrola zadaní - %(name)s - %(levelname)s - %(message)s')
 stream_handler = logging.StreamHandler(sys.stderr)
 stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
@@ -82,10 +76,9 @@ class Issue():
         self.line = line
 
 
-# Nejaký takýto objekt dostane test do parametra logger. Defaultná
-# implementácia iba vypíše chyby do konzoly. V budúcnosti je možné takto
-# prispôsobiť výstup tohto skriptu pre editory kde môže fungovať ako linter.
-# Parameter severity je z modulu logging (napr logging.WARNING)
+# Nejaký takýto objekt dostane test do parametra logger. Defaultná implementácia iba vypíše chyby do
+# konzoly. V budúcnosti je možné takto prispôsobiť výstup tohto skriptu pre editory kde môže
+# fungovať ako linter. Parameter severity je z modulu logging (napr logging.WARNING)
 class IssueLogger():
     def logMessage(self, severity, message):
         pass
@@ -106,12 +99,10 @@ def taskComplete(logger, test_data):
     success = True
     for task in test_data["tasks"]:
         if not task.task_name:
-            logger.logIssue(logging.ERROR, Issue("Úloha nemá meno!",
-                            task.task_filename))
+            logger.logIssue(logging.ERROR, Issue("Úloha nemá meno!", task.task_filename))
             success = False
         if not task.task_author:
-            logger.logIssue(logging.ERROR, Issue("Úloha nemá autora!",
-                            task.task_filename))
+            logger.logIssue(logging.ERROR, Issue("Úloha nemá autora!", task.task_filename))
             success = False
     return TestResult.OK if success else TestResult.ERROR
 
@@ -126,8 +117,8 @@ def taskProofreaded(logger, test_data):
     success = True
     for task in test_data["tasks"]:
         if not task.task_proofreader:
-            logger.logIssue(logging.WARNING, Issue("Úloha nie je " +
-                            "sproofreadovaná!", task.task_filename))
+            logger.logIssue(logging.WARNING, Issue("Úloha nie je sproofreadovaná!",
+                            task.task_filename))
             success = False
     return TestResult.OK if success else TestResult.WARNING
 
@@ -136,8 +127,7 @@ def taskProofreaded(logger, test_data):
 def taskFirstLetter(logger, test_data):
     """Kontrola prvého písmenka úlohy.
 
-    Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne
-    písmenko."""
+    Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne písmenko."""
     if not test_data["tasks"]:
         logger.logMessage(logging.INFO, 'Nemám path k úloham, skippujem sa...')
         return TestResult.SKIP
@@ -150,9 +140,8 @@ def taskFirstLetter(logger, test_data):
     for task in test_data["tasks"]:
         if not task.task_name.startswith(config[task.task_number-1]):
             logger.logIssue(logging.ERROR,
-                            Issue(("Úloha \"{0}\" nezačína správnym písmenom" +
-                                  " ({1})!").format(task.task_name,
-                                                    config[task.task_number-1]),
+                            Issue(("Úloha \"{0}\" nezačína správnym písmenom ({1})!"
+                                  .format(task.task_name, config[task.task_number-1])),
                                   task.task_filename))
             success = False
     return TestResult.OK if success else TestResult.ERROR
@@ -162,8 +151,8 @@ def taskFirstLetter(logger, test_data):
 def taskCorrectPoints(logger, test_data):
     """Kontrola správneho súčtu bodov.
 
-    Tento test zlyhá ak úlohy nemajú správne súčty bodov. Správne súčty bodov
-    sú 10 za príklady 1-3, 15 za 4-5 a 20 za 6-8."""
+    Tento test zlyhá ak úlohy nemajú správne súčty bodov. Správne súčty bodov sú 10 za príklady
+    1-3, 15 za 4-5 a 20 za 6-8."""
     if not test_data["tasks"]:
         logger.logMessage(logging.INFO, 'Nemám path k úloham, skippujem sa...')
         return TestResult.SKIP
@@ -175,15 +164,12 @@ def taskCorrectPoints(logger, test_data):
 
     success = True
     for task in test_data["tasks"]:
-        task_points = (task.task_points["bodypopis"] +
-                       task.task_points["bodyprogram"])
+        task_points = (task.task_points["bodypopis"] + task.task_points["bodyprogram"])
         if task_points != config[task.task_number-1]:
             logger.logIssue(logging.ERROR,
-                            Issue(("Úloha \"{0}\" nemá spávny počet bodov! " +
-                                   "Má {1}, má mať " +
-                                   "{2}.").format(task.task_name,
-                                                  task_points,
-                                                  config[task.task_number-1]),
+                            Issue(("Úloha \"{0}\" nemá spávny počet bodov! Má {1}, má mať {2}."
+                                   .format(task.task_name, task_points,
+                                           config[task.task_number-1])),
                                   task.task_filename))
             success = False
     return TestResult.OK if success else TestResult.ERROR
@@ -204,53 +190,45 @@ class Task():
             found_task_number = re.search('prikl([0-9]*)', fname).group(1)
             self.task_number = int(found_task_number)
         except (AttributeError, IndexError, ValueError):
-            logger.error('Súbor %s nie je valídne meno príkladu!',
-                         self.task_filename)
+            logger.error('Súbor %s nie je valídne meno príkladu!', self.task_filename)
 
         # Vyparsujme meno príkladu
         try:
             # Regex ktoý chce matchnúť meno príkladu (po # a pred {} s bodmi)
             found_task_name = re.search('\.?#([^{}]*)', lines[0]).group(1)
             self.task_name = found_task_name.strip()
-            logger.debug('Vyparsované meno príkladu (%s) z %s', self.task_name,
-                         self.task_filename)
+            logger.debug('Vyparsované meno príkladu (%s) z %s', self.task_name, self.task_filename)
         except (AttributeError, IndexError):
-            logger.warning('Nepodarilo sa vyparsovať meno príkladu z %s',
-                           self.task_filename)
+            logger.warning('Nepodarilo sa vyparsovať meno príkladu z %s', self.task_filename)
 
         # Vyparsujeme body za príklad
         try:
             # Regex ktorý chce matchnúť čísleka s bodmi
-            found_points = re.search('{bodypopis=([0-9]*) bodyprogram=' +
-                                     '([0-9]*)}', lines[0])
+            found_points = re.search('{bodypopis=([0-9]*) bodyprogram=([0-9]*)}', lines[0])
             self.task_points["bodypopis"] = int(found_points.group(1))
             self.task_points["bodyprogram"] = int(found_points.group(2))
-            logger.debug('Vyparsované body (%s) z príkladu %s',
-                         self.task_points, self.task_filename)
+            logger.debug('Vyparsované body (%s) z príkladu %s', self.task_points,
+                         self.task_filename)
         except (AttributeError, IndexError, ValueError):
-            logger.warning('Nepodarilo sa vyprasovať body z príkladu %s',
-                           self.task_filename)
+            logger.warning('Nepodarilo sa vyprasovať body z príkladu %s', self.task_filename)
 
         for line in lines:
             # Vyparsujeme autora
             found_author = re.search('%by (.*)', line)
             if found_author:
                 if self.task_author is not None:
-                    logger.warning('Úloha %s má údajne viac autorov!',
-                                   self.task_filename)
+                    logger.warning('Úloha %s má údajne viac autorov!', self.task_filename)
                 self.task_author = found_author.group(1)
-                logger.debug('Nájdený autor (%s) úlohy %s', self.task_author,
-                             self.task_filename)
+                logger.debug('Nájdený autor (%s) úlohy %s', self.task_author, self.task_filename)
 
             # Vyparsujeme proofreadera
             found_proofreader = re.search('%proofread (.*)', line)
             if found_proofreader:
                 if self.task_proofreader is not None:
-                    logger.warning('Úloha %s má údajne viac proofreaderov!',
-                                   self.task_filename)
+                    logger.warning('Úloha %s má údajne viac proofreaderov!', self.task_filename)
                 self.task_proofreader = found_proofreader.group(1)
-                logger.debug('Nájdený proofreader (%s) úlohy %s',
-                             self.task_proofreader, self.task_filename)
+                logger.debug('Nájdený proofreader (%s) úlohy %s', self.task_proofreader,
+                             self.task_filename)
 
     def __init__(self, task_filename=None, task_text=None):
         self.task_plaintext = task_text
@@ -284,11 +262,9 @@ def execute(args, tests):
     if args.path_to_tasks:
         # Bola nám daná cesta k zadaniam, dajme ju testom. Ale najskôr tieto
         # zadania loadnime a sparsujme
-        logger.debug("Spúšťam testy na zadaniach z '%s'",
-                     args.path_to_tasks[0])
+        logger.debug("Spúšťam testy na zadaniach z '%s'", args.path_to_tasks[0])
         if not os.path.isdir(args.path_to_tasks[0]):
-            logger.critical("folder '%s' nenájdený alebo nie je folder!",
-                            args.path_to_tasks[0])
+            logger.critical("folder '%s' nenájdený alebo nie je folder!", args.path_to_tasks[0])
         for task_filename in os.listdir(args.path_to_tasks[0]):
             task_filename = os.path.join(args.path_to_tasks[0], task_filename)
             if os.path.isfile(task_filename):
@@ -309,8 +285,6 @@ def execute(args, tests):
         # TODO add test data for solutions and inputs
         test_data = {"path_to_tasks": args.path_to_tasks,
                      "tasks": tasks}
-        # deepcopy lebo nechceme aby prišiel niekto, v teste zmenil test_data
-        # a tak rozbil všetky ostatné
 
         # Implementácia IssueLoggera
         class ConsoleIssueLogger(IssueLogger):
@@ -328,8 +302,9 @@ def execute(args, tests):
                     self.logger.log(severity, "File %s: %s",
                                     issue.file, issue.message)
 
-        status = test["run"](ConsoleIssueLogger('checker.' + test_name),
-                             copy.deepcopy(test_data))
+        # deepcopy lebo nechceme aby prišiel niekto, v teste zmenil test_data
+        # a tak rozbil všetky ostatné
+        status = test["run"](ConsoleIssueLogger('checker.' + test_name), copy.deepcopy(test_data))
         results[status] += 1
 
         if status == TestResult.ERROR:
@@ -349,12 +324,10 @@ def execute(args, tests):
     logger.info("          ERROR   - %i", results[TestResult.ERROR])
 
     if results[TestResult.ERROR] != 0:
-        logger.critical("Celé zle. Zlyhalo %i testov!",
-                        results[TestResult.ERROR])
+        logger.critical("Celé zle. Zlyhalo %i testov!", results[TestResult.ERROR])
         return 1
     elif results[TestResult.WARNING] != 0:
-        logger.warning("Testy zbehli ok, ale bolo %i warningov!",
-                       results[TestResult.WARNING])
+        logger.warning("Testy zbehli ok, ale bolo %i warningov!", results[TestResult.WARNING])
         return 0
     else:
         logger.info("Testy zbehli ok. Dobrá práca.")
@@ -365,22 +338,18 @@ def main():
     argumentParser = argparse.ArgumentParser(description="Checker KSP zadaní")
     argumentParser.add_argument('--tasks', nargs=1, dest='path_to_tasks',
                                 help="Cesta k foldru so zadaniamu")
-    argumentParser.add_argument('--inputs', nargs=1,
-                                dest="path_to_inputs",
+    argumentParser.add_argument('--inputs', nargs=1, dest="path_to_inputs",
                                 help="Cesta k foldru so vstupmi")
-    argumentParser.add_argument('--solutions', nargs=1,
-                                dest="path_to_solutions",
+    argumentParser.add_argument('--solutions', nargs=1, dest="path_to_solutions",
                                 help="Cesta k foldru so vzorákmi")
-    argumentParser.add_argument('-p', '--print-tests', action="store_true",
-                                dest="print_only",
+    argumentParser.add_argument('-p', '--print-tests', action="store_true", dest="print_only",
                                 help="Iba vypíš aké testy poznáš a skonči")
     argumentParser.add_argument('--strict', action="store_true", dest="strict",
                                 help="Správaj sa k warningom ako k chybám")
-    argumentParser.add_argument('-s', '--skip', nargs='*', dest="skip",
-                                metavar="test", help="Preskoč tieto testy")
-    argumentParser.add_argument('-r', '--run-only', nargs='*', dest="runonly",
-                                metavar="test", help="spusti IBA tieto " +
-                                "testy. Overridne --skip")
+    argumentParser.add_argument('-s', '--skip', nargs='*', dest="skip", metavar="test",
+                                help="Preskoč tieto testy")
+    argumentParser.add_argument('-r', '--run-only', nargs='*', dest="runonly", metavar="test",
+                                help="spusti IBA tieto testy. Overridne --skip")
     argumentParser.add_argument('-v', action="count", dest="verbosity",
                                 help="Viac sa vykecávaj (-vv kecá ešte viac)")
     args = argumentParser.parse_args()
@@ -400,8 +369,7 @@ def main():
         tests_to_run = dict()
         for tst_name in args.runonly:
             if tst_name not in test.all:
-                logger.critical("Bol requestnutý beh testu " + tst_name +
-                                ", ale ten neexistuje.")
+                logger.critical("Bol requestnutý beh testu %s, ale ten neexistuje.", tst_name)
                 return 1
             tests_to_run[tst_name] = test.all[tst_name]
         return execute(args, tests_to_run)
@@ -412,8 +380,8 @@ def main():
         tests_to_run = dict(test.all)
         for tst_name in args.skip:
             if tst_name not in test.all:
-                logger.critical("Bolo requestnuté skipnutie testu " +
-                                tst_name + ", ale tento neexistuje.")
+                logger.critical("Bolo requestnuté skipnutie testu %s, ale tento neexistuje.",
+                                tst_name)
                 return 1
             del tests_to_run[tst_name]
         return execute(args, tests_to_run)
