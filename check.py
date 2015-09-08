@@ -22,6 +22,24 @@
 # Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a docstringom, o ostatné
 # sa starať netreba :)
 #
+# Workflow scriptu
+# ----------------
+#
+# Najskôr beží `main`. Jej úlohou je sparsovať argumenty ktore boli scriptu dané. Na základe týchto
+# argumentov spúšťa ostatné časti scriptu. Obvykle upraví zoznam testov ktoré majú bežať a spustí
+# funkciu `execute`. Táto funkcia zoberie cesty k zadaniam, vstupom a vzorákom a spustí na nich
+# funkcie `parse_{tasks,inputs,solutions}`. Tieto funkcie sa preiterujú súbormi so správnym menom, a
+# na každom súbore spustia `parse_{task,input,solution}`. Tieto funkcie sparsujú už konkrétny súbor.
+# Sú umiestnené v časti skriptu "PARSER" a určené na pravidelné menenie maintainerom testov pri
+# zmene formátu súborov. Funkcie `parse_{task,input,solution}` vrátia objekty sparsovaných vecí
+# funkciám `parse_{tasks,inputs,solutions}`. Tieto vrátia listy sparsovaných objektov funkcii
+# `execute`. Táto funkcia z týchto dát postaví `test_data` dict, ktorý sa neskôr bude dávať
+# jednotlivým testom. `execute` následne spustí funkciu `execute_tests` so zoznamom testov, dictom
+# `test_data` a classou loggera ktorú maju testy používať. `execute_tests` následne spúšťa
+# jednotlivé testy (pre každý vytvorí instanciu loggera s appropriate identifikátorom testu). Zoznam
+# so štatistikami ohľadom behu testov vráti `execute`, ktorý vypíše finálne hlášky a vygeneruje
+# vhodný return code.
+#
 # Čo týmto skriptom básnik myslel...
 # ----------------------------------
 #
