@@ -80,6 +80,9 @@ class Issue():
 # konzoly. V budúcnosti je možné takto prispôsobiť výstup tohto skriptu pre editory kde môže
 # fungovať ako linter. Parameter severity je z modulu logging (napr logging.WARNING)
 class IssueLogger():
+    def __init__(self, logger_name):
+        pass
+
     def logMessage(self, severity, message):
         pass
 
@@ -249,62 +252,60 @@ class Task():
 # -----------------------------------------------------------------------------
 
 
+# Implementácia IssueLoggera ktorý vypisuje veci priamo do konzoly
+class ConsoleIssueLogger(IssueLogger):
+    def __init__(self, logger_name):
+        self.logger = logging.getLogger(logger_name)
+
+    def logMessage(self, severity, message):
+        self.logger.log(severity, message)
+
+    def logIssue(self, severity, issue):
+        if issue.line:
+            self.logger.log(severity, "File %s, line %i: %s", issue.file, issue.line, issue.message)
+        else:
+            self.logger.log(severity, "File %s: %s", issue.file, issue.message)
+
+
 def print_tests():
     for tst_name, tst in test.all.items():
         print(tst_name, " - ", tst['doc'])
         print()
 
 
-def execute(args, tests):
-    logger.debug("Spustím tieto testy: %s", tests.keys())
+def parse_tasks(path_to_tasks):
     tasks = []
+    if not os.path.isdir(path_to_tasks):
+        logger.critical("folder '%s' nenájdený alebo nie je folder!", path_to_tasks)
+    for task_filename in os.listdir(path_to_tasks):
+        task_filename = os.path.join(path_to_tasks, task_filename)
+        if os.path.isfile(task_filename):
+            logger.debug("Čítam zadanie %s", task_filename)
+            task_file = open(task_filename, 'r')
+            tasks.append(Task(task_filename, task_file.read()))
+    return tasks
 
-    if args.path_to_tasks:
-        # Bola nám daná cesta k zadaniam, dajme ju testom. Ale najskôr tieto
-        # zadania loadnime a sparsujme
-        logger.debug("Spúšťam testy na zadaniach z '%s'", args.path_to_tasks[0])
-        if not os.path.isdir(args.path_to_tasks[0]):
-            logger.critical("folder '%s' nenájdený alebo nie je folder!", args.path_to_tasks[0])
-        for task_filename in os.listdir(args.path_to_tasks[0]):
-            task_filename = os.path.join(args.path_to_tasks[0], task_filename)
-            if os.path.isfile(task_filename):
-                logger.debug("Čítam zadanie %s", task_filename)
-                task_file = open(task_filename, 'r')
-                tasks.append(Task(task_filename, task_file.read()))
 
-    # TODO okrem iného chceme loadnuť a sparsovať vstupy a vzoráky ešte
+def parse_inputs(path_to_inputs):
+    pass
 
+
+def parse_solutions(path_to_solutions):
+    pass
+
+
+def execute_tests(tests, test_data, logger_class):
     results = {TestResult.SKIP: 0,
                TestResult.OK: 0,
                TestResult.WARNING: 0,
                TestResult.ERROR: 0}
 
-    # Spustime testy
     for test_name, test in tests.items():
         logger.debug("Spúšťam test %s", test_name)
-        # TODO add test data for solutions and inputs
-        test_data = {"path_to_tasks": args.path_to_tasks,
-                     "tasks": tasks}
 
-        # Implementácia IssueLoggera
-        class ConsoleIssueLogger(IssueLogger):
-            def __init__(self, logger_name):
-                self.logger = logging.getLogger(logger_name)
-
-            def logMessage(self, severity, message):
-                self.logger.log(severity, message)
-
-            def logIssue(self, severity, issue):
-                if issue.line:
-                    self.logger.log(severity, "File %s, line %i: %s",
-                                    issue.file, issue.line, issue.message)
-                else:
-                    self.logger.log(severity, "File %s: %s",
-                                    issue.file, issue.message)
-
-        # deepcopy lebo nechceme aby prišiel niekto, v teste zmenil test_data
-        # a tak rozbil všetky ostatné
-        status = test["run"](ConsoleIssueLogger('checker.' + test_name), copy.deepcopy(test_data))
+        # deepcopy lebo nechceme aby prišiel niekto, v teste zmenil test_data a tak rozbil všetky
+        # ostatné testy
+        status = test["run"](logger_class('checker.' + test_name), copy.deepcopy(test_data))
         results[status] += 1
 
         if status == TestResult.ERROR:
@@ -312,9 +313,41 @@ def execute(args, tests):
         elif status == TestResult.WARNING:
             logger.warning("Test %s skončil s varovaním!", test_name)
         elif status == TestResult.OK:
-            logger.info("Test %s je ok.", test_name)
+            logger.debug("Test %s je ok.", test_name)
         elif status == TestResult.SKIP:
             logger.debug("Test %s skippol sám seba", test_name)
+
+    return results
+
+
+def execute(args, tests):
+    logger.debug("Spustím tieto testy: %s", tests.keys())
+    tasks = None
+    inputs = None
+    solutions = None
+
+    if args.path_to_tasks:
+        logger.debug("Spúšťam testy na zadaniach z '%s'", args.path_to_tasks[0])
+        tasks = parse_tasks(args.path_to_tasks[0])
+
+    if args.path_to_inputs:
+        logger.debug("Spúšťam testy na vstupoch z '%s'", args.path_to_inputs[0])
+        inputs = parse_inputs(args.path_to_inputs[0])
+
+    if args.path_to_solutions:
+        logger.debug("Spúšťam testy na vzorákoch z '%s'", args.path_to_solutions[0])
+        solutions = parse_solutions(args.path_to_solutions[0])
+
+    test_data = {"path_to_tasks": args.path_to_tasks[0] if args.path_to_tasks is not None else None,
+                 "path_to_solutions": (args.path_to_solutions[0]
+                                       if args.path_to_solutions is not None else None),
+                 "path_to_inputs": (args.path_to_inputs[0]
+                                    if args.path_to_inputs is not None else None),
+                 "tasks": tasks,
+                 "solutions": solutions,
+                 "inputs": inputs}
+
+    results = execute_tests(tests, test_data, ConsoleIssueLogger)
 
     logger.info("Done\n\n")
 
