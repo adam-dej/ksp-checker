@@ -363,6 +363,106 @@ def solutionAllListingsExist(logger, test_data):
     return TestResult.OK if success else TestResult.ERROR
 
 
+@test
+def taskHasInputs(logger, test_data):
+    """Kontrola či každá úloha má vstupy."""
+    if not test_data["tasks"] or not test_data["inputs"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path ku úlohám a ku vstupom, skippujem sa...')
+        return TestResult.SKIP
+
+    success = True
+    for task in test_data["tasks"]:
+        if not test_data["inputs"][task.number-1]:
+            logger.logIssue(logging.WARNING, Issue("Úloha nemá vstupy!", task.filename))
+            success = False
+    return TestResult.OK if success else TestResult.WARNING
+
+
+@test
+def inputsHaveUnixNewlines(logger, test_data):
+    """Kontrola či majú vstupy UNIXácke newlines."""
+    if not test_data["inputs"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path ku vstupom, skippujem sa...')
+        return TestResult.SKIP
+
+    success = True
+    for tests in test_data["inputs"]:
+        for inp, inp_filename in tests.items():
+            inp_file = open(inp_filename, 'rb')
+            line_number = 1
+            for line in inp_file:
+                if '\r\n' in line.decode('utf-8'):
+                    logger.logIssue(logging.ERROR, Issue("Vstup má Windowsácky newline!",
+                                                         inp_filename, line_number))
+                    success = False
+                    inp_file.close()
+                    break
+                line_number += 1
+            inp_file.close()
+    return TestResult.OK if success else TestResult.ERROR
+
+
+@test
+def inputsNoTrailingWhitespace(logger, test_data):
+    """Kontrola či vstupy a výstupy nemajú medzery na konci riadkov."""
+    if not test_data["inputs"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path ku vstupom, skippujem sa...')
+        return TestResult.SKIP
+
+    success = True
+    for tests in test_data["inputs"]:
+        for inp, inp_filename in tests.items():
+            inp_file = open(inp_filename, 'r')
+            line_number = 1
+            for line in inp_file:
+                if re.match("[^ \t\r\f\v]*[ \t\r\f\v]+$", line):
+                    logger.logIssue(logging.WARNING,
+                                    Issue("Vstup má na konci riadku whitespaces!", inp_filename,
+                                          line_number))
+                    success = False
+                line_number += 1
+            inp_file.close()
+    return TestResult.OK if success else TestResult.WARNING
+
+
+@test
+def eachInputHasOutput(logger, test_data):
+    """Kontrola či každý .in súbor zo vstupov má prislúchajúci .out súbor"""
+    if not test_data["inputs"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path ku vstupom, skippujem sa...')
+        return TestResult.SKIP
+
+    success = True
+    for tests in test_data["inputs"]:
+        for inp, inp_filename in tests.items():
+            if inp.endswith('.in') and inp[:-3]+'.out' not in tests.keys():
+                logger.logIssue(logging.ERROR, Issue("Vstup nemá výstup!", inp_filename))
+                success = False
+    return TestResult.OK if success else TestResult.ERROR
+
+
+@test
+def inputHasNewlineAtEof(logger, test_data):
+    """Kontrola či posledný riadok vo vstupoch a výstupoch končí znakom nového riadku."""
+    if not test_data["inputs"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path ku vstupom, skippujem sa...')
+        return TestResult.SKIP
+
+    success = True
+    for tests in test_data["inputs"]:
+        for inp, inp_filename in tests.items():
+            inp_file = open(inp_filename, 'r')
+            line_number = 1
+            for line in inp_file:
+                line_number += 1
+            if not line.endswith('\n'):
+                logger.logIssue(logging.ERROR,
+                                Issue("Súbor nekončí znakom nového riadku!", inp_filename,
+                                      line_number))
+                success = False
+            inp_file.close()
+    return TestResult.OK if success else TestResult.ERROR
+
 # -----------------------------------------------------------------------------
 
 # --------------------------------- PARSER ------------------------------------
@@ -524,7 +624,21 @@ def parse_markdown(IssueLogger, path_to_files, what):
 
 
 def parse_inputs(IssueLogger, path_to_inputs):
-    pass
+    inputs = []
+    if not os.path.isdir(path_to_inputs):
+        logger.critical("folder '%s' nenájdený alebo nie je folder!", path_to_files)
+    for i in range(1, 9):
+        folder = os.path.join(path_to_inputs, str(i))
+        if os.path.isdir(folder):
+            task_inputs = {}
+            inputs_folder = os.path.join(folder, 'test')
+            if os.path.isdir(inputs_folder):
+                for inp in os.listdir(inputs_folder):
+                    task_inputs[inp] = os.path.join(inputs_folder, inp)
+            inputs.append(task_inputs)
+        else:
+            inputs.append(None)
+    return inputs
 
 
 def execute_tests(tests, test_data, logger_class):
