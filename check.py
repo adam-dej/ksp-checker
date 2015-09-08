@@ -267,6 +267,102 @@ def taskSamplesWhitespace(logger, test_data):
     return TestResult.OK if success else TestResult.ERROR
 
 
+@test
+def allSolutionsPresent(logger, test_data):
+    """Kontrola či existujú všetky vzoráky."""
+    if not test_data["solutions"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path ku vzorákom, skippujem sa...')
+        return TestResult.SKIP
+
+    solutions_exist = [False]*8
+
+    for solution in test_data["solutions"]:
+        solutions_exist[solution.number-1] = True
+
+    for solution_number, solution_exists in enumerate(solutions_exist):
+        if not solution_exists:
+            logger.logIssue(logging.WARNING,
+                            Issue("Vzorák číslo {0} neexistuje!".format(solution_number+1), ""))
+
+    return TestResult.OK if all(solutions_exist) else TestResult.WARNING
+
+
+@test
+def solutionComplete(logger, test_data):
+    """Kontrola či vzorák má meno a autora."""
+    if not test_data["solutions"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path ku vzorákom, skippujem sa...')
+        return TestResult.SKIP
+
+    success = True
+    for solution in test_data["solutions"]:
+        if not solution.name:
+            logger.logIssue(logging.ERROR, Issue("Vzorák nemá meno!", solution.filename))
+            success = False
+        if not solution.author:
+            logger.logIssue(logging.ERROR, Issue("Vzorák nemá autora!", solution.filename))
+            success = False
+    return TestResult.OK if success else TestResult.ERROR
+
+
+@test
+def solutionMatchesTask(logger, test_data):
+    """Kontrola či úloha a prislúchajúci vzorák majú rovnaké meno a rovnaké body."""
+    if not test_data["tasks"] or not test_data["solutions"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path k úloham alebo vzorákom, skippujem sa...')
+        return TestResult.SKIP
+
+    tasks = [None]*8
+    solutions = [None]*8
+
+    for task in test_data["tasks"]:
+        tasks[task.number-1] = task
+
+    for solution in test_data["solutions"]:
+        solutions[solution.number-1] = solution
+
+    success = True
+    for index in range(8):
+        if tasks[index] and solutions[index]:
+            if tasks[index].name != solutions[index].name:
+                logger.logIssue(logging.ERROR,
+                                Issue(("Názov vzoráku \"{0}\" sa nezhoduje s názvom" +
+                                       " úlohy \"{1}\"").format(solutions[index].name,
+                                                                tasks[index].name),
+                                      solutions[index].filename))
+                success = False
+            if tasks[index].points != solutions[index].points:
+                logger.logIssue(logging.ERROR,
+                                Issue(("Body za úlohu \"{1}\" sa nezhodujú s bodmi vo vzoráku " +
+                                       "\"{0}\"").format(solutions[index].points,
+                                                         tasks[index].points),
+                                      solutions[index].filename))
+                success = False
+    return TestResult.OK if success else TestResult.ERROR
+
+
+@test
+def solutionAllListingsExist(logger, test_data):
+    """Kontrola či existujú všetky súbory listingov použité vo vzoráku."""
+    if not test_data["solutions"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path ku vzorákom, skippujem sa...')
+        return TestResult.SKIP
+
+    success = True
+    for solution in test_data["solutions"]:
+        for idx, line in enumerate(solution.plaintext.splitlines()):
+            # Matchne '\listing{...}'
+            match = re.match('\\\\listing{([^}]*)}', line)
+            if match and not os.path.isfile(os.path.join(os.path.dirname(solution.filename),
+                                                         match.group(1))):
+                logger.logIssue(logging.ERROR,
+                                Issue("Listing {0} neexistuje!".format(match.group(1)),
+                                      solution.filename, idx+1))
+                success = False
+
+    return TestResult.OK if success else TestResult.ERROR
+
+
 # -----------------------------------------------------------------------------
 
 # --------------------------------- PARSER ------------------------------------
@@ -282,6 +378,17 @@ class Task():
         self.points = {}
         self.author = None
         self.proofreader = None
+
+
+class Solution():
+    def __init__(self, solution_filename=None, solution_text=None):
+        self.plaintext = solution_text
+        self.filename = solution_filename
+
+        self.name = None
+        self.number = None
+        self.points = {}
+        self.author = None
 
 
 def parse_task(logger, task_filename):
@@ -336,6 +443,44 @@ def parse_task(logger, task_filename):
     return task
 
 
+def parse_solution(logger, solution_filename):
+    # Binary read mode lebo zachovajme newlines
+    solution_file = open(solution_filename, 'rb')
+    solution = Solution(solution_filename, solution_file.read().decode("utf-8"))
+
+    lines = solution.plaintext.splitlines()
+
+    # Vyparsujeme číslo príkladu
+    fname = os.path.basename(solution.filename)
+    try:
+        found_solution_number = re.search('prikl([0-9]*)', fname).group(1)
+        solution.number = int(found_solution_number)
+    except (AttributeError, IndexError, ValueError):
+        logger.logIssue(logging.ERROR, Issue("Súbor nemá platné číslo príkladu!", fname))
+        return None
+
+    # Vyparsujme meno príkladu
+    try:
+        # Regex ktoý chce matchnúť meno príkladu (po # a pred {} s bodmi)
+        found_solution_name = re.search('\.?#([^{}]*)', lines[0]).group(1)
+        solution.name = found_solution_name.strip()
+    except (AttributeError, IndexError):
+        logger.logIssue(logging.WARNING, Issue("Nepodarilo sa zistiť meno príkladu!", fname))
+
+    # Vyparsujeme autora a body za príklad
+    try:
+        # Regex ktorý chce matchnúť autora a čísleka s bodmi
+        found = re.search('{vzorak="([^"]*)" bodypopis=([0-9]*) bodyprogram=([0-9]*)}', lines[0])
+        solution.author = found.group(1)
+        solution.points["bodypopis"] = int(found.group(2))
+        solution.points["bodyprogram"] = int(found.group(3))
+    except (AttributeError, IndexError, ValueError):
+        logger.logIssue(logging.WARNING, Issue("Nepodarilo sa zistiť autora a body za príklad!",
+                        fname))
+
+    return solution
+
+
 # -----------------------------------------------------------------------------
 
 
@@ -360,25 +505,25 @@ def print_tests():
         print()
 
 
-def parse_tasks(IssueLogger, path_to_tasks):
+def parse_markdown(IssueLogger, path_to_files, what):
     VALID_TASK_FILE_NAME = 'prikl*.md'
-    tasks = []
-    if not os.path.isdir(path_to_tasks):
-        logger.critical("folder '%s' nenájdený alebo nie je folder!", path_to_tasks)
-    for task_filename in glob.iglob(os.path.join(path_to_tasks, VALID_TASK_FILE_NAME)):
-        if os.path.isfile(task_filename):
-            logger.debug("Čítam zadanie %s", task_filename)
-            task = parse_task(IssueLogger("checker.parser.task"), task_filename)
-            if task is not None:
-                tasks.append(task)
-    return tasks
+    things = []
+    if not os.path.isdir(path_to_files):
+        logger.critical("folder '%s' nenájdený alebo nie je folder!", path_to_files)
+    for filename in glob.iglob(os.path.join(path_to_files, VALID_TASK_FILE_NAME)):
+        if os.path.isfile(filename):
+            logger.debug("Čítam súbor %s", filename)
+            if what == "tasks":
+                thing = parse_task(IssueLogger("checker.parser.task"), filename)
+            elif what == "solutions":
+                thing = parse_solution(IssueLogger("checker.parser.solution"), filename)
+
+            if thing is not None:
+                things.append(thing)
+    return things
 
 
 def parse_inputs(IssueLogger, path_to_inputs):
-    pass
-
-
-def parse_solutions(IssueLogger, path_to_solutions):
     pass
 
 
@@ -416,7 +561,7 @@ def execute(args, tests):
 
     if args.path_to_tasks:
         logger.debug("Spúšťam testy na zadaniach z '%s'", args.path_to_tasks[0])
-        tasks = parse_tasks(ConsoleIssueLogger, args.path_to_tasks[0])
+        tasks = parse_markdown(ConsoleIssueLogger, args.path_to_tasks[0], "tasks")
 
     if args.path_to_inputs:
         logger.debug("Spúšťam testy na vstupoch z '%s'", args.path_to_inputs[0])
@@ -424,7 +569,7 @@ def execute(args, tests):
 
     if args.path_to_solutions:
         logger.debug("Spúšťam testy na vzorákoch z '%s'", args.path_to_solutions[0])
-        solutions = parse_solutions(ConsoleIssueLogger, args.path_to_solutions[0])
+        solutions = parse_markdown(ConsoleIssueLogger, args.path_to_solutions[0], "solutions")
 
     test_data = {"path_to_tasks": args.path_to_tasks[0] if args.path_to_tasks is not None else None,
                  "path_to_solutions": (args.path_to_solutions[0]
