@@ -74,6 +74,25 @@ class TestResult(Enum):
     WARNING = 2
     ERROR = 3
 
+
+class Issue():
+    def __init__(self, message, file, line=None):
+        self.message = message
+        self.file = file
+        self.line = line
+
+
+# Nejaký takýto objekt dostane test do parametra logger. Defaultná
+# implementácia iba vypíše chyby do konzoly. V budúcnosti je možné takto
+# prispôsobiť výstup tohto skriptu pre editory kde môže fungovať ako linter.
+# Parameter severity je z modulu logging (napr logging.WARNING)
+class IssueLogger():
+    def logMessage(self, severity, message):
+        pass
+
+    def logIssue(self, severity, Issue):
+        pass
+
 # ---------------------------------- TESTY ------------------------------------
 
 
@@ -81,16 +100,18 @@ class TestResult(Enum):
 def taskComplete(logger, test_data):
     """Kontrola či úloha má meno a autora"""
     if not test_data["tasks"]:
-        logger.info('Nemám path k úloham, skippujem sa...')
+        logger.logMessage(logging.INFO, 'Nemám path k úloham, skippujem sa...')
         return TestResult.SKIP
 
     success = True
     for task in test_data["tasks"]:
         if not task.task_name:
-            logger.error("Úloha %s nemá meno!", task.task_filename)
+            logger.logIssue(logging.ERROR, Issue("Úloha nemá meno!",
+                            task.task_filename))
             success = False
         if not task.task_author:
-            logger.error("Úloha %s nemá autora!", task.task_filename)
+            logger.logIssue(logging.ERROR, Issue("Úloha nemá autora!",
+                            task.task_filename))
             success = False
     return TestResult.OK if success else TestResult.ERROR
 
@@ -99,14 +120,14 @@ def taskComplete(logger, test_data):
 def taskProofreaded(logger, test_data):
     """Kontrola či je úloha sproofreadovaná"""
     if not test_data["tasks"]:
-        logger.info('Nemám path k úloham, skippujem sa...')
+        logger.logMessage(logging.INFO, 'Nemám path k úloham, skippujem sa...')
         return TestResult.SKIP
 
     success = True
     for task in test_data["tasks"]:
         if not task.task_proofreader:
-            logger.warning("Úloha {0} nie je sproofreadovaná!"
-                           .format(task.task_filename))
+            logger.logIssue(logging.WARNING, Issue("Úloha nie je " +
+                            "sproofreadovaná!", task.task_filename))
             success = False
     return TestResult.OK if success else TestResult.WARNING
 
@@ -118,7 +139,7 @@ def taskFirstLetter(logger, test_data):
     Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne
     písmenko."""
     if not test_data["tasks"]:
-        logger.info('Nemám path k úloham, skippujem sa...')
+        logger.logMessage(logging.INFO, 'Nemám path k úloham, skippujem sa...')
         return TestResult.SKIP
 
     config = []
@@ -128,8 +149,11 @@ def taskFirstLetter(logger, test_data):
     success = True
     for task in test_data["tasks"]:
         if not task.task_name.startswith(config[task.task_number-1]):
-            logger.error("Úloha {0} nezačína správnym písmenom!"
-                         .format(task.task_filename))
+            logger.logIssue(logging.ERROR,
+                            Issue(("Úloha \"{0}\" nezačína správnym písmenom" +
+                                  " ({1})!").format(task.task_name,
+                                                    config[task.task_number-1]),
+                                  task.task_filename))
             success = False
     return TestResult.OK if success else TestResult.ERROR
 
@@ -141,7 +165,7 @@ def taskCorrectPoints(logger, test_data):
     Tento test zlyhá ak úlohy nemajú správne súčty bodov. Správne súčty bodov
     sú 10 za príklady 1-3, 15 za 4-5 a 20 za 6-8."""
     if not test_data["tasks"]:
-        logger.info('Nemám path k úloham, skippujem sa...')
+        logger.logMessage(logging.INFO, 'Nemám path k úloham, skippujem sa...')
         return TestResult.SKIP
 
     config = []
@@ -154,8 +178,13 @@ def taskCorrectPoints(logger, test_data):
         task_points = (task.task_points["bodypopis"] +
                        task.task_points["bodyprogram"])
         if task_points != config[task.task_number-1]:
-            logger.error("Úloha {0} nemá správny súčet bodov!"
-                         .format(task.task_filename))
+            logger.logIssue(logging.ERROR,
+                            Issue(("Úloha \"{0}\" nemá spávny počet bodov! " +
+                                   "Má {1}, má mať " +
+                                   "{2}.").format(task.task_name,
+                                                  task_points,
+                                                  config[task.task_number-1]),
+                                  task.task_filename))
             success = False
     return TestResult.OK if success else TestResult.ERROR
 
@@ -282,7 +311,24 @@ def execute(args, tests):
                      "tasks": tasks}
         # deepcopy lebo nechceme aby prišiel niekto, v teste zmenil test_data
         # a tak rozbil všetky ostatné
-        status = test["run"](logging.getLogger('checker.' + test_name),
+
+        # Implementácia IssueLoggera
+        class ConsoleIssueLogger(IssueLogger):
+            def __init__(self, logger_name):
+                self.logger = logging.getLogger(logger_name)
+
+            def logMessage(self, severity, message):
+                self.logger.log(severity, message)
+
+            def logIssue(self, severity, issue):
+                if issue.line:
+                    self.logger.log(severity, "File %s, line %i: %s",
+                                    issue.file, issue.line, issue.message)
+                else:
+                    self.logger.log(severity, "File %s: %s",
+                                    issue.file, issue.message)
+
+        status = test["run"](ConsoleIssueLogger('checker.' + test_name),
                              copy.deepcopy(test_data))
         results[status] += 1
 
