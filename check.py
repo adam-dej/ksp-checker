@@ -242,6 +242,31 @@ def taskSamplesEndWithUnixNewline(logger, test_data):
     return TestResult.OK if success else TestResult.ERROR
 
 
+@test
+def taskSamplesWhitespace(logger, test_data):
+    """Kontrola či príklady vstupu / výstupu nekončia medzerou."""
+    if not test_data["tasks"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
+        return TestResult.SKIP
+
+    success = True
+    for task in test_data["tasks"]:
+        lines = task.task_plaintext.splitlines(True)
+        checking = False
+        for index, line in enumerate(lines):
+            if line.startswith('```vstup') or line.startswith('```vystup'):
+                checking = True
+                continue
+            if line.startswith('```'):
+                checking = False
+                continue
+            if checking and re.match("[^ \t\r\f\v]*[ \t\r\f\v]+$", line):
+                logger.logIssue(logging.ERROR, Issue("Riadok končí whitespace-om!",
+                                                     task.task_filename, index+1))
+                success = False
+    return TestResult.OK if success else TestResult.ERROR
+
+
 # -----------------------------------------------------------------------------
 
 # --------------------------------- PARSER ------------------------------------
