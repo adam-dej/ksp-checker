@@ -196,6 +196,52 @@ def taskCorrectPoints(logger, test_data):
             success = False
     return TestResult.OK if success else TestResult.ERROR
 
+
+@test
+def allTasksPresent(logger, test_data):
+    """Kontrola či existuje všetkých 8 úloh."""
+    if not test_data["tasks"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
+        return TestResult.SKIP
+
+    tasks_exist = [False]*8
+
+    for task in test_data["tasks"]:
+        tasks_exist[task.task_number-1] = True
+
+    for task_number, task_exists in enumerate(tasks_exist):
+        if not task_exists:
+            logger.logIssue(logging.ERROR,
+                            Issue("Úloha číslo {0} neexistuje!".format(task_number+1), ""))
+
+    return TestResult.OK if all(tasks_exist) else TestResult.ERROR
+
+
+@test
+def taskSamplesEndWithUnixNewline(logger, test_data):
+    """Kontrola či všetky príklady vstupu / výstupu končia s UNIX newline."""
+    if not test_data["tasks"]:
+        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
+        return TestResult.SKIP
+
+    success = True
+    for task in test_data["tasks"]:
+        lines = task.task_plaintext.splitlines(True)
+        checking = False
+        for index, line in enumerate(lines):
+            if line.startswith('```vstup') or line.startswith('```vystup'):
+                checking = True
+                continue
+            if line.startswith('```'):
+                checking = False
+                continue
+            if checking and line.endswith('\r\n'):
+                logger.logIssue(logging.ERROR, Issue("Riadok má Windowsácky endline!",
+                                                     task.task_filename, index+1))
+                success = False
+    return TestResult.OK if success else TestResult.ERROR
+
+
 # -----------------------------------------------------------------------------
 
 # --------------------------------- PARSER ------------------------------------
@@ -214,8 +260,9 @@ class Task():
 
 
 def parse_task(logger, task_filename):
-    task_file = open(task_filename, 'r')
-    task = Task(task_filename, task_file.read())
+    # Binary read mode lebo zachovajme newlines
+    task_file = open(task_filename, 'rb')
+    task = Task(task_filename, task_file.read().decode("utf-8"))
 
     lines = task.task_plaintext.splitlines()
 
@@ -258,7 +305,7 @@ def parse_task(logger, task_filename):
         if found_proofreader:
             if task.task_proofreader is not None:
                 logger.logIssue(logging.WARNING, Issue('Úloha má údajne viac proofreaderov!',
-                                                       fname, idx))
+                                                       fname, idx+1))
             task.task_proofreader = found_proofreader.group(1)
 
     return task
