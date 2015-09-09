@@ -28,9 +28,15 @@
 # Dekorátory je treba používať v poradí v akom sú tu popísané.
 #
 # @test: Týmto dekorátorom sa registruje test. Každá funkcia obsahujúca tento dekorátor je
-#        považovaná sa test.
+#        považovaná sa test. Dekorátor berie jeden parameter, a to je závažnosť testu. Ak test
+#        nevráti nejakú vec z TestResult v prípade vrátenia falsy objektu bude vrátená táto hodnota.
 # @require: Tento dekorátor spôsobí vrátenie TestResult.SKIP ak v test_data nie je potrebný údaj pre
-#           beh daného testu.
+#           beh daného testu. Ako parameter berie list potrebných keys z test_data
+# @for_each_item: Tento iterátor bere ako parameter kľúč do test_data. Spôsobí to, že sa preiteruje
+#                 cez test_data[parameter] a test spustí pre každý item miesto iba raz pre celé
+#                 test_data. Použitie tohto dekorátora mení hlavičku testu, a druhý parameter už nie
+#                 je test_data, ale item z test_data[parameter]. Príklad v praxi: Chceme spustiť
+#                 tento test pre každé zadanie v test_data["tasks"].
 #
 # Workflow scriptu
 # ----------------
@@ -80,13 +86,32 @@ stream_handler.setFormatter(formatter)
 logger.addHandler(stream_handler)
 
 
+class TestResult(Enum):
+    OK = 0
+    SKIP = 1
+    WARNING = 2
+    ERROR = 3
+
+
 class TestRegistrar():
     def __init__(self):
         self.all = {}
 
-    def __call__(self, func):
-        self.all[func.__name__] = {"doc": func.__doc__, "run": func}
-        return func
+    def __call__(self, severity):
+        def registrar_decorator(func):
+            def wrapper(logger, test_data):
+                status = func(logger, test_data)
+                # Ak funkcia vráti boolean miesto TestResult, vráťme hodnotu parametra severity pri
+                # zlyhaní.
+                logger.logMessage(logging.DEBUG, "Test vrátil " + str(status))
+                if not isinstance(status, TestResult):
+                    return severity if not status else TestResult.OK
+                else:
+                    return status
+
+            self.all[func.__name__] = {"doc": func.__doc__, "run": wrapper}
+            return wrapper
+        return registrar_decorator
 
 test = TestRegistrar()
 
@@ -105,11 +130,18 @@ def require(listOfRequirements):
     return require_decorator
 
 
-class TestResult(Enum):
-    OK = 0
-    SKIP = 1
-    WARNING = 2
-    ERROR = 3
+def for_each_item(items, bypassable=False):
+    def foreach_decorator(function):
+        def wrapper(logger, test_data):
+            success = True
+            for item in test_data[items]:
+                if not function(logger, item):
+                    success = False
+            return success
+        wrapper.__name__ = function.__name__
+        wrapper.__doc__ = function.__doc__
+        return wrapper
+    return foreach_decorator
 
 
 class Issue():
@@ -132,87 +164,10 @@ class IssueLogger():
     def logIssue(self, severity, Issue):
         pass
 
+
 # ---------------------------------- TESTY ------------------------------------
 
-
-@test
-@require(["tasks"])
-def taskComplete(logger, test_data):
-    """Kontrola či úloha má meno a autora"""
-    success = True
-    for task in test_data["tasks"]:
-        if not task.name:
-            logger.logIssue(logging.ERROR, Issue("Úloha nemá meno!", task.filename))
-            success = False
-        if not task.author:
-            logger.logIssue(logging.ERROR, Issue("Úloha nemá autora!", task.filename))
-            success = False
-    return TestResult.OK if success else TestResult.ERROR
-
-
-@test
-@require(["tasks"])
-def taskProofreaded(logger, test_data):
-    """Kontrola či je úloha sproofreadovaná"""
-
-    success = True
-    for task in test_data["tasks"]:
-        if not task.proofreader:
-            logger.logIssue(logging.WARNING, Issue("Úloha nie je sproofreadovaná!",
-                            task.filename))
-            success = False
-    return TestResult.OK if success else TestResult.WARNING
-
-
-@test
-@require(["tasks"])
-def taskFirstLetter(logger, test_data):
-    """Kontrola prvého písmenka úlohy.
-
-    Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne písmenko."""
-
-    config = []
-    config += ['Z']*4  # Prvé 4 úlohy majú začínať Z-tkom
-    config += ['O']*4  # Ďalšie 4 úlohy majú začínať O-čkom
-
-    success = True
-    for task in test_data["tasks"]:
-        if not task.name.startswith(config[task.number-1]):
-            logger.logIssue(logging.ERROR,
-                            Issue(("Úloha \"{0}\" nezačína správnym písmenom ({1})!"
-                                  .format(task.name, config[task.number-1])),
-                                  task.filename))
-            success = False
-    return TestResult.OK if success else TestResult.ERROR
-
-
-@test
-@require(["tasks"])
-def taskCorrectPoints(logger, test_data):
-    """Kontrola správneho súčtu bodov.
-
-    Tento test zlyhá ak úlohy nemajú správne súčty bodov. Správne súčty bodov sú 10 za príklady
-    1-3, 15 za 4-5 a 20 za 6-8."""
-
-    config = []
-    config += [10]*3  # Úlohy 1-3 10b
-    config += [15]*2  # Úlohy 4-5 15b
-    config += [20]*3  # Úlohy 6-8 20b
-
-    success = True
-    for task in test_data["tasks"]:
-        task_points = (task.points["bodypopis"] + task.points["bodyprogram"])
-        if task_points != config[task.number-1]:
-            logger.logIssue(logging.ERROR,
-                            Issue(("Úloha \"{0}\" nemá spávny počet bodov! Má {1}, má mať {2}."
-                                   .format(task.name, task_points,
-                                           config[task.number-1])),
-                                  task.filename))
-            success = False
-    return TestResult.OK if success else TestResult.ERROR
-
-
-@test
+@test(TestResult.ERROR)
 @require(["tasks"])
 def allTasksPresent(logger, test_data):
     """Kontrola či existuje všetkých 8 úloh."""
@@ -227,56 +182,128 @@ def allTasksPresent(logger, test_data):
             logger.logIssue(logging.ERROR,
                             Issue("Úloha číslo {0} neexistuje!".format(task_number+1), ""))
 
-    return TestResult.OK if all(tasks_exist) else TestResult.ERROR
+    return all(tasks_exist)
 
 
-@test
+@test(TestResult.ERROR)
 @require(["tasks"])
-def taskSamplesEndWithUnixNewline(logger, test_data):
-    """Kontrola či všetky príklady vstupu / výstupu končia s UNIX newline."""
+@for_each_item("tasks")
+def taskComplete(logger, task):
+    """Kontrola či úloha má meno a autora"""
 
     success = True
-    for task in test_data["tasks"]:
-        lines = task.plaintext.splitlines(True)
-        checking = False
-        for index, line in enumerate(lines):
-            if line.startswith('```vstup') or line.startswith('```vystup'):
-                checking = True
-                continue
-            if line.startswith('```'):
-                checking = False
-                continue
-            if checking and line.endswith('\r\n'):
-                logger.logIssue(logging.ERROR, Issue("Riadok má Windowsácky endline!",
-                                                     task.filename, index+1))
-                success = False
-    return TestResult.OK if success else TestResult.ERROR
+    if not task.name:
+        logger.logIssue(logging.ERROR, Issue("Úloha nemá meno!", task.filename))
+        success = False
+    if not task.author:
+        logger.logIssue(logging.ERROR, Issue("Úloha nemá autora!", task.filename))
+        success = False
+    return success
 
 
-@test
+@test(TestResult.WARNING)
 @require(["tasks"])
-def taskSamplesWhitespace(logger, test_data):
+@for_each_item("tasks")
+def taskProofreaded(logger, task):
+    """Kontrola či je úloha sproofreadovaná"""
+
+    if not task.proofreader:
+        logger.logIssue(logging.WARNING, Issue("Úloha nie je sproofreadovaná!", task.filename))
+        return False
+    return True
+
+
+@test(TestResult.ERROR)
+@require(["tasks"])
+@for_each_item("tasks")
+def taskFirstLetter(logger, task):
+    """Kontrola prvého písmenka úlohy.
+
+    Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne písmenko."""
+
+    config = []
+    config += ['Z']*4  # Prvé 4 úlohy majú začínať Z-tkom
+    config += ['O']*4  # Ďalšie 4 úlohy majú začínať O-čkom
+
+    if not task.name.startswith(config[task.number-1]):
+        logger.logIssue(logging.ERROR,
+                        Issue(("Úloha \"{0}\" nezačína správnym písmenom ({1})!"
+                              .format(task.name, config[task.number-1])), task.filename))
+        return False
+    return True
+
+
+@test(TestResult.ERROR)
+@require(["tasks"])
+@for_each_item("tasks")
+def taskCorrectPoints(logger, task):
+    """Kontrola správneho súčtu bodov.
+
+    Tento test zlyhá ak úlohy nemajú správne súčty bodov. Správne súčty bodov sú 10 za príklady
+    1-3, 15 za 4-5 a 20 za 6-8."""
+
+    config = []
+    config += [10]*3  # Úlohy 1-3 10b
+    config += [15]*2  # Úlohy 4-5 15b
+    config += [20]*3  # Úlohy 6-8 20b
+
+    task_points = (task.points["bodypopis"] + task.points["bodyprogram"])
+    if task_points != config[task.number-1]:
+        logger.logIssue(logging.ERROR,
+                        Issue(("Úloha \"{0}\" nemá spávny počet bodov! Má {1}, má mať {2}."
+                               .format(task.name, task_points, config[task.number-1])),
+                              task.filename))
+        return False
+    return True
+
+
+@test(TestResult.ERROR)
+@require(["tasks"])
+@for_each_item("tasks")
+def taskSamplesEndWithUnixNewline(logger, task):
+    """Kontrola či všetky príklady vstupu / výstupu končia s UNIX newline."""
+
+    lines = task.plaintext.splitlines(True)
+    checking = False
+    success = True
+    for index, line in enumerate(lines):
+        if line.startswith('```vstup') or line.startswith('```vystup'):
+            checking = True
+            continue
+        if line.startswith('```'):
+            checking = False
+            continue
+        if checking and line.endswith('\r\n'):
+            logger.logIssue(logging.ERROR, Issue("Riadok má Windowsácky endline!",
+                                                 task.filename, index+1))
+            success = False
+    return success
+
+
+@test(TestResult.ERROR)
+@require(["tasks"])
+@for_each_item("tasks")
+def taskSamplesWhitespace(logger, task):
     """Kontrola či príklady vstupu / výstupu nekončia medzerou."""
 
     success = True
-    for task in test_data["tasks"]:
-        lines = task.plaintext.splitlines(True)
-        checking = False
-        for index, line in enumerate(lines):
-            if line.startswith('```vstup') or line.startswith('```vystup'):
-                checking = True
-                continue
-            if line.startswith('```'):
-                checking = False
-                continue
-            if checking and re.match("[^ \t\r\f\v]*[ \t\r\f\v]+$", line):
-                logger.logIssue(logging.ERROR, Issue("Riadok končí whitespace-om!",
-                                                     task.filename, index+1))
-                success = False
-    return TestResult.OK if success else TestResult.ERROR
+    lines = task.plaintext.splitlines(True)
+    checking = False
+    for index, line in enumerate(lines):
+        if line.startswith('```vstup') or line.startswith('```vystup'):
+            checking = True
+            continue
+        if line.startswith('```'):
+            checking = False
+            continue
+        if checking and re.match("[^ \t\r\f\v]*[ \t\r\f\v]+$", line):
+            logger.logIssue(logging.ERROR, Issue("Riadok končí whitespace-om!", task.filename,
+                                                 index+1))
+            success = False
+    return success
 
 
-@test
+@test(TestResult.WARNING)
 @require(["solutions"])
 def allSolutionsPresent(logger, test_data):
     """Kontrola či existujú všetky vzoráky."""
@@ -291,26 +318,26 @@ def allSolutionsPresent(logger, test_data):
             logger.logIssue(logging.WARNING,
                             Issue("Vzorák číslo {0} neexistuje!".format(solution_number+1), ""))
 
-    return TestResult.OK if all(solutions_exist) else TestResult.WARNING
+    return all(solutions_exist)
 
 
-@test
+@test(TestResult.ERROR)
 @require(["solutions"])
-def solutionComplete(logger, test_data):
+@for_each_item("solutions")
+def solutionComplete(logger, solution):
     """Kontrola či vzorák má meno a autora."""
 
     success = True
-    for solution in test_data["solutions"]:
-        if not solution.name:
-            logger.logIssue(logging.ERROR, Issue("Vzorák nemá meno!", solution.filename))
-            success = False
-        if not solution.author:
-            logger.logIssue(logging.ERROR, Issue("Vzorák nemá autora!", solution.filename))
-            success = False
-    return TestResult.OK if success else TestResult.ERROR
+    if not solution.name:
+        logger.logIssue(logging.ERROR, Issue("Vzorák nemá meno!", solution.filename))
+        success = False
+    if not solution.author:
+        logger.logIssue(logging.ERROR, Issue("Vzorák nemá autora!", solution.filename))
+        success = False
+    return success
 
 
-@test
+@test(TestResult.ERROR)
 @require(["tasks", "solutions"])
 def solutionMatchesTask(logger, test_data):
     """Kontrola či úloha a prislúchajúci vzorák majú rovnaké meno a rovnaké body."""
@@ -341,30 +368,29 @@ def solutionMatchesTask(logger, test_data):
                                                          tasks[index].points),
                                       solutions[index].filename))
                 success = False
-    return TestResult.OK if success else TestResult.ERROR
+    return success
 
 
-@test
+@test(TestResult.ERROR)
 @require(["solutions"])
-def solutionAllListingsExist(logger, test_data):
+@for_each_item("solutions")
+def solutionAllListingsExist(logger, solution):
     """Kontrola či existujú všetky súbory listingov použité vo vzoráku."""
 
     success = True
-    for solution in test_data["solutions"]:
-        for idx, line in enumerate(solution.plaintext.splitlines()):
-            # Matchne '\listing{...}'
-            match = re.match('\\\\listing{([^}]*)}', line)
-            if match and not os.path.isfile(os.path.join(os.path.dirname(solution.filename),
-                                                         match.group(1))):
-                logger.logIssue(logging.ERROR,
-                                Issue("Listing {0} neexistuje!".format(match.group(1)),
-                                      solution.filename, idx+1))
-                success = False
-
-    return TestResult.OK if success else TestResult.ERROR
+    for idx, line in enumerate(solution.plaintext.splitlines()):
+        # Matchne '\listing{...}'
+        match = re.match('\\\\listing{([^}]*)}', line)
+        if match and not os.path.isfile(os.path.join(os.path.dirname(solution.filename),
+                                                     match.group(1))):
+            logger.logIssue(logging.ERROR,
+                            Issue("Listing {0} neexistuje!".format(match.group(1)),
+                                  solution.filename, idx+1))
+            success = False
+    return success
 
 
-@test
+@test(TestResult.WARNING)
 @require(["tasks", "inputs"])
 def taskHasInputs(logger, test_data):
     """Kontrola či každá úloha má vstupy."""
@@ -374,88 +400,81 @@ def taskHasInputs(logger, test_data):
         if not test_data["inputs"][task.number-1]:
             logger.logIssue(logging.WARNING, Issue("Úloha nemá vstupy!", task.filename))
             success = False
-    return TestResult.OK if success else TestResult.WARNING
+    return success
 
 
-@test
+@test(TestResult.ERROR)
 @require(["inputs"])
-def inputsHaveUnixNewlines(logger, test_data):
+@for_each_item("inputs")
+def inputsHaveUnixNewlines(logger, tests):
     """Kontrola či majú vstupy UNIXácke newlines."""
-    if not test_data["inputs"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path ku vstupom, skippujem sa...')
-        return TestResult.SKIP
 
-    success = True
-    for tests in test_data["inputs"]:
-        for inp, inp_filename in tests.items():
-            inp_file = open(inp_filename, 'rb')
-            line_number = 1
-            for line in inp_file:
-                if '\r\n' in line.decode('utf-8'):
-                    logger.logIssue(logging.ERROR, Issue("Vstup má Windowsácky newline!",
-                                                         inp_filename, line_number))
-                    success = False
-                    inp_file.close()
-                    break
-                line_number += 1
-            inp_file.close()
-    return TestResult.OK if success else TestResult.ERROR
+    for inp, inp_filename in tests.items():
+        inp_file = open(inp_filename, 'rb')
+        line_number = 1
+        for line in inp_file:
+            if '\r\n' in line.decode('utf-8'):
+                logger.logIssue(logging.ERROR, Issue("Vstup má Windowsácky newline!",
+                                                     inp_filename, line_number))
+                inp_file.close()
+                return False
+            line_number += 1
+        inp_file.close()
+    return True
 
 
-@test
+@test(TestResult.WARNING)
 @require(["inputs"])
-def inputsNoTrailingWhitespace(logger, test_data):
+@for_each_item("inputs")
+def inputsNoTrailingWhitespace(logger, tests):
     """Kontrola či vstupy a výstupy nemajú medzery na konci riadkov."""
 
     success = True
-    for tests in test_data["inputs"]:
-        for inp, inp_filename in tests.items():
-            inp_file = open(inp_filename, 'r')
-            line_number = 1
-            for line in inp_file:
-                if re.match("[^ \t\r\f\v]*[ \t\r\f\v]+$", line):
-                    logger.logIssue(logging.WARNING,
-                                    Issue("Vstup má na konci riadku whitespaces!", inp_filename,
-                                          line_number))
-                    success = False
-                line_number += 1
-            inp_file.close()
-    return TestResult.OK if success else TestResult.WARNING
-
-
-@test
-@require(["inputs"])
-def eachInputHasOutput(logger, test_data):
-    """Kontrola či každý .in súbor zo vstupov má prislúchajúci .out súbor"""
-
-    success = True
-    for tests in test_data["inputs"]:
-        for inp, inp_filename in tests.items():
-            if inp.endswith('.in') and inp[:-3]+'.out' not in tests.keys():
-                logger.logIssue(logging.ERROR, Issue("Vstup nemá výstup!", inp_filename))
-                success = False
-    return TestResult.OK if success else TestResult.ERROR
-
-
-@test
-@require(["inputs"])
-def inputHasNewlineAtEof(logger, test_data):
-    """Kontrola či posledný riadok vo vstupoch a výstupoch končí znakom nového riadku."""
-
-    success = True
-    for tests in test_data["inputs"]:
-        for inp, inp_filename in tests.items():
-            inp_file = open(inp_filename, 'r')
-            line_number = 1
-            for line in inp_file:
-                line_number += 1
-            if not line.endswith('\n'):
-                logger.logIssue(logging.ERROR,
-                                Issue("Súbor nekončí znakom nového riadku!", inp_filename,
+    for inp, inp_filename in tests.items():
+        inp_file = open(inp_filename, 'r')
+        line_number = 1
+        for line in inp_file:
+            if re.match("[^ \t\r\f\v]*[ \t\r\f\v]+$", line):
+                logger.logIssue(logging.WARNING,
+                                Issue("Vstup má na konci riadku whitespaces!", inp_filename,
                                       line_number))
                 success = False
-            inp_file.close()
-    return TestResult.OK if success else TestResult.ERROR
+            line_number += 1
+        inp_file.close()
+    return success
+
+
+@test(TestResult.ERROR)
+@require(["inputs"])
+@for_each_item("inputs")
+def eachInputHasOutput(logger, tests):
+    """Kontrola či každý .in súbor zo vstupov má prislúchajúci .out súbor"""
+
+    for inp, inp_filename in tests.items():
+        if inp.endswith('.in') and inp[:-3]+'.out' not in tests.keys():
+            logger.logIssue(logging.ERROR, Issue("Vstup nemá výstup!", inp_filename))
+            return False
+    return True
+
+
+@test(TestResult.ERROR)
+@require(["inputs"])
+@for_each_item("inputs")
+def inputHasNewlineAtEof(logger, tests):
+    """Kontrola či posledný riadok vo vstupoch a výstupoch končí znakom nového riadku."""
+
+    for inp, inp_filename in tests.items():
+        inp_file = open(inp_filename, 'r')
+        line_number = 1
+        for line in inp_file:
+            line_number += 1
+        inp_file.close()
+        if not line.endswith('\n'):
+            logger.logIssue(logging.ERROR,
+                            Issue("Súbor nekončí znakom nového riadku!", inp_filename, line_number))
+            return False
+    return True
+
 
 # -----------------------------------------------------------------------------
 
