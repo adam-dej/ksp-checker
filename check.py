@@ -25,7 +25,8 @@
 # Dekorátory
 # ----------
 #
-# Dekorátory je treba používať v poradí v akom sú tu popísané.
+# Dekorátory je treba používať v poradí v akom sú tu popísané. Všetky dekorátory iné ako @test
+# sú len pre pohodlnosť pri písaní testov a nemusia byť použité.
 #
 # @test: Týmto dekorátorom sa registruje test. Každá funkcia obsahujúca tento dekorátor je
 #        považovaná sa test. Dekorátor berie jeden parameter, a to je závažnosť testu. Ak test
@@ -37,6 +38,12 @@
 #                 test_data. Použitie tohto dekorátora mení hlavičku testu, a druhý parameter už nie
 #                 je test_data, ale item z test_data[parameter]. Príklad v praxi: Chceme spustiť
 #                 tento test pre každé zadanie v test_data["tasks"].
+#                 Optional parameter tohto dekorátora je bypassable. Ak je true a item obsahuje
+#                 list `bypass` a tento list obsahuje meno testu dekorovaného týmto, tak test sa
+#                 pre tento súbor preskočí. V praxi sa tento list buduje z komentárov štýlu
+#                 '%skiptest testName' zo zadaní a vzorákov a slúži na preskočenie neaplikovateľných
+#                 testov na ten vzorák / zadanie (napríklad úlohou je vypísať 10 medzier na čo sa
+#                 test sťažuje že výstup ma trailing whitespaces, tak tento test preskočíme)
 #
 # Workflow scriptu
 # ----------------
@@ -103,7 +110,6 @@ class TestRegistrar():
                 status = func(logger, test_data)
                 # Ak funkcia vráti boolean miesto TestResult, vráťme hodnotu parametra severity pri
                 # zlyhaní.
-                logger.logMessage(logging.DEBUG, "Test vrátil " + str(status))
                 if not isinstance(status, TestResult):
                     return severity if not status else TestResult.OK
                 else:
@@ -135,6 +141,11 @@ def for_each_item(items, bypassable=False):
         def wrapper(logger, test_data):
             success = True
             for item in test_data[items]:
+                if bypassable and item.bypass and function.__name__ in item.bypass:
+                    logger.logMessage(logging.DEBUG, (("Nájdená inštrukcia na preskočenie testu v" +
+                                                       " \"{0}\", preskakujem test {1}")
+                                                      .format(item.filename, function.__name__)))
+                    continue
                 if not function(logger, item):
                     success = False
             return success
@@ -203,7 +214,7 @@ def taskComplete(logger, task):
 
 @test(TestResult.WARNING)
 @require(["tasks"])
-@for_each_item("tasks")
+@for_each_item("tasks", bypassable=True)
 def taskProofreaded(logger, task):
     """Kontrola či je úloha sproofreadovaná"""
 
@@ -215,7 +226,7 @@ def taskProofreaded(logger, task):
 
 @test(TestResult.ERROR)
 @require(["tasks"])
-@for_each_item("tasks")
+@for_each_item("tasks", bypassable=True)
 def taskFirstLetter(logger, task):
     """Kontrola prvého písmenka úlohy.
 
@@ -235,7 +246,7 @@ def taskFirstLetter(logger, task):
 
 @test(TestResult.ERROR)
 @require(["tasks"])
-@for_each_item("tasks")
+@for_each_item("tasks", bypassable=True)
 def taskCorrectPoints(logger, task):
     """Kontrola správneho súčtu bodov.
 
@@ -259,7 +270,7 @@ def taskCorrectPoints(logger, task):
 
 @test(TestResult.ERROR)
 @require(["tasks"])
-@for_each_item("tasks")
+@for_each_item("tasks", bypassable=True)
 def taskSamplesEndWithUnixNewline(logger, task):
     """Kontrola či všetky príklady vstupu / výstupu končia s UNIX newline."""
 
@@ -282,7 +293,7 @@ def taskSamplesEndWithUnixNewline(logger, task):
 
 @test(TestResult.ERROR)
 @require(["tasks"])
-@for_each_item("tasks")
+@for_each_item("tasks", bypassable=True)
 def taskSamplesWhitespace(logger, task):
     """Kontrola či príklady vstupu / výstupu nekončia medzerou."""
 
@@ -492,6 +503,8 @@ class Task():
         self.author = None
         self.proofreader = None
 
+        self.bypass = []
+
 
 class Solution():
     def __init__(self, solution_filename=None, solution_text=None):
@@ -502,6 +515,8 @@ class Solution():
         self.number = None
         self.points = {}
         self.author = None
+
+        self.bypass = []
 
 
 def parse_task(logger, task_filename):
@@ -544,6 +559,11 @@ def parse_task(logger, task_filename):
             if task.author is not None:
                 logger.warning('Úloha %s má údajne viac autorov!', task.filename)
             task.author = found_author.group(1)
+
+        # Vyparsujeme ktoré testy máme preskočiť
+        found_skiptest = re.search('%skiptest (.*)', line)
+        if found_skiptest:
+            task.bypass.append(found_skiptest.group(1))
 
         # Vyparsujeme proofreadera
         found_proofreader = re.search('%proofread (.*)', line)
@@ -590,6 +610,13 @@ def parse_solution(logger, solution_filename):
     except (AttributeError, IndexError, ValueError):
         logger.logIssue(logging.WARNING, Issue("Nepodarilo sa zistiť autora a body za príklad!",
                         fname))
+
+    for idx, line in enumerate(lines):
+
+        # Vyparsujeme ktoré testy máme preskočiť
+        found_skiptest = re.search('%skiptest (.*)', line)
+        if found_skiptest:
+            solution.bypass.append(found_skiptest.group(1))
 
     return solution
 
