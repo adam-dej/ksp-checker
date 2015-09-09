@@ -717,6 +717,9 @@ def execute(args, tests):
     inputs = None
     solutions = None
 
+    if not (args.path_to_tasks or args.path_to_inputs or args.path_to_solutions):
+        logger.warning("Nedal si mi ani zadania, ani vstupy ani vzoráky. Čo mám teda testovať?")
+
     if args.path_to_tasks:
         logger.debug("Spúšťam testy na zadaniach z '%s'", args.path_to_tasks[0])
         tasks = parse_markdown(ConsoleIssueLogger, args.path_to_tasks[0], "tasks")
