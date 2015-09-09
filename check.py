@@ -22,6 +22,16 @@
 # Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a docstringom, o ostatné
 # sa starať netreba :)
 #
+# Dekorátory
+# ----------
+#
+# Dekorátory je treba používať v poradí v akom sú tu popísané.
+#
+# @test: Týmto dekorátorom sa registruje test. Každá funkcia obsahujúca tento dekorátor je
+#        považovaná sa test.
+# @require: Tento dekorátor spôsobí vrátenie TestResult.SKIP ak v test_data nie je potrebný údaj pre
+#           beh daného testu.
+#
 # Workflow scriptu
 # ----------------
 #
@@ -81,6 +91,20 @@ class TestRegistrar():
 test = TestRegistrar()
 
 
+def require(listOfRequirements):
+    def require_decorator(function):
+        def require_wrapper(logger, test_data):
+            for requirement in listOfRequirements:
+                if requirement not in test_data.keys() or not test_data[requirement]:
+                    logger.logMessage(logging.DEBUG, 'Nemám potrebné veci, skippupjem sa...')
+                    return TestResult.SKIP
+            return function(logger, test_data)
+        require_wrapper.__name__ = function.__name__
+        require_wrapper.__doc__ = function.__doc__
+        return require_wrapper
+    return require_decorator
+
+
 class TestResult(Enum):
     OK = 0
     SKIP = 1
@@ -112,12 +136,9 @@ class IssueLogger():
 
 
 @test
+@require(["tasks"])
 def taskComplete(logger, test_data):
     """Kontrola či úloha má meno a autora"""
-    if not test_data["tasks"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
-        return TestResult.SKIP
-
     success = True
     for task in test_data["tasks"]:
         if not task.name:
@@ -130,11 +151,9 @@ def taskComplete(logger, test_data):
 
 
 @test
+@require(["tasks"])
 def taskProofreaded(logger, test_data):
     """Kontrola či je úloha sproofreadovaná"""
-    if not test_data["tasks"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
-        return TestResult.SKIP
 
     success = True
     for task in test_data["tasks"]:
@@ -146,13 +165,11 @@ def taskProofreaded(logger, test_data):
 
 
 @test
+@require(["tasks"])
 def taskFirstLetter(logger, test_data):
     """Kontrola prvého písmenka úlohy.
 
     Tento test zlyhá, ak úlohy v kategórií Z a O nezačínajú na správne písmenko."""
-    if not test_data["tasks"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
-        return TestResult.SKIP
 
     config = []
     config += ['Z']*4  # Prvé 4 úlohy majú začínať Z-tkom
@@ -170,14 +187,12 @@ def taskFirstLetter(logger, test_data):
 
 
 @test
+@require(["tasks"])
 def taskCorrectPoints(logger, test_data):
     """Kontrola správneho súčtu bodov.
 
     Tento test zlyhá ak úlohy nemajú správne súčty bodov. Správne súčty bodov sú 10 za príklady
     1-3, 15 za 4-5 a 20 za 6-8."""
-    if not test_data["tasks"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
-        return TestResult.SKIP
 
     config = []
     config += [10]*3  # Úlohy 1-3 10b
@@ -198,11 +213,9 @@ def taskCorrectPoints(logger, test_data):
 
 
 @test
+@require(["tasks"])
 def allTasksPresent(logger, test_data):
     """Kontrola či existuje všetkých 8 úloh."""
-    if not test_data["tasks"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
-        return TestResult.SKIP
 
     tasks_exist = [False]*8
 
@@ -218,11 +231,9 @@ def allTasksPresent(logger, test_data):
 
 
 @test
+@require(["tasks"])
 def taskSamplesEndWithUnixNewline(logger, test_data):
     """Kontrola či všetky príklady vstupu / výstupu končia s UNIX newline."""
-    if not test_data["tasks"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
-        return TestResult.SKIP
 
     success = True
     for task in test_data["tasks"]:
@@ -243,11 +254,9 @@ def taskSamplesEndWithUnixNewline(logger, test_data):
 
 
 @test
+@require(["tasks"])
 def taskSamplesWhitespace(logger, test_data):
     """Kontrola či príklady vstupu / výstupu nekončia medzerou."""
-    if not test_data["tasks"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path k úloham, skippujem sa...')
-        return TestResult.SKIP
 
     success = True
     for task in test_data["tasks"]:
@@ -268,11 +277,9 @@ def taskSamplesWhitespace(logger, test_data):
 
 
 @test
+@require(["solutions"])
 def allSolutionsPresent(logger, test_data):
     """Kontrola či existujú všetky vzoráky."""
-    if not test_data["solutions"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path ku vzorákom, skippujem sa...')
-        return TestResult.SKIP
 
     solutions_exist = [False]*8
 
@@ -288,11 +295,9 @@ def allSolutionsPresent(logger, test_data):
 
 
 @test
+@require(["solutions"])
 def solutionComplete(logger, test_data):
     """Kontrola či vzorák má meno a autora."""
-    if not test_data["solutions"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path ku vzorákom, skippujem sa...')
-        return TestResult.SKIP
 
     success = True
     for solution in test_data["solutions"]:
@@ -306,11 +311,9 @@ def solutionComplete(logger, test_data):
 
 
 @test
+@require(["tasks", "solutions"])
 def solutionMatchesTask(logger, test_data):
     """Kontrola či úloha a prislúchajúci vzorák majú rovnaké meno a rovnaké body."""
-    if not test_data["tasks"] or not test_data["solutions"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path k úloham alebo vzorákom, skippujem sa...')
-        return TestResult.SKIP
 
     tasks = [None]*8
     solutions = [None]*8
@@ -342,11 +345,9 @@ def solutionMatchesTask(logger, test_data):
 
 
 @test
+@require(["solutions"])
 def solutionAllListingsExist(logger, test_data):
     """Kontrola či existujú všetky súbory listingov použité vo vzoráku."""
-    if not test_data["solutions"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path ku vzorákom, skippujem sa...')
-        return TestResult.SKIP
 
     success = True
     for solution in test_data["solutions"]:
@@ -364,11 +365,9 @@ def solutionAllListingsExist(logger, test_data):
 
 
 @test
+@require(["tasks", "inputs"])
 def taskHasInputs(logger, test_data):
     """Kontrola či každá úloha má vstupy."""
-    if not test_data["tasks"] or not test_data["inputs"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path ku úlohám a ku vstupom, skippujem sa...')
-        return TestResult.SKIP
 
     success = True
     for task in test_data["tasks"]:
@@ -379,6 +378,7 @@ def taskHasInputs(logger, test_data):
 
 
 @test
+@require(["inputs"])
 def inputsHaveUnixNewlines(logger, test_data):
     """Kontrola či majú vstupy UNIXácke newlines."""
     if not test_data["inputs"]:
@@ -403,11 +403,9 @@ def inputsHaveUnixNewlines(logger, test_data):
 
 
 @test
+@require(["inputs"])
 def inputsNoTrailingWhitespace(logger, test_data):
     """Kontrola či vstupy a výstupy nemajú medzery na konci riadkov."""
-    if not test_data["inputs"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path ku vstupom, skippujem sa...')
-        return TestResult.SKIP
 
     success = True
     for tests in test_data["inputs"]:
@@ -426,11 +424,9 @@ def inputsNoTrailingWhitespace(logger, test_data):
 
 
 @test
+@require(["inputs"])
 def eachInputHasOutput(logger, test_data):
     """Kontrola či každý .in súbor zo vstupov má prislúchajúci .out súbor"""
-    if not test_data["inputs"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path ku vstupom, skippujem sa...')
-        return TestResult.SKIP
 
     success = True
     for tests in test_data["inputs"]:
@@ -442,11 +438,9 @@ def eachInputHasOutput(logger, test_data):
 
 
 @test
+@require(["inputs"])
 def inputHasNewlineAtEof(logger, test_data):
     """Kontrola či posledný riadok vo vstupoch a výstupoch končí znakom nového riadku."""
-    if not test_data["inputs"]:
-        logger.logMessage(logging.DEBUG, 'Nemám path ku vstupom, skippujem sa...')
-        return TestResult.SKIP
 
     success = True
     for tests in test_data["inputs"]:
