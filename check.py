@@ -681,7 +681,7 @@ def parse_inputs(IssueLogger, path_to_inputs):
     return inputs
 
 
-def execute_tests(tests, test_data, logger_class):
+def execute_tests(tests, test_data, logger_class, strict):
     results = {TestResult.SKIP: 0,
                TestResult.OK: 0,
                TestResult.WARNING: 0,
@@ -693,6 +693,10 @@ def execute_tests(tests, test_data, logger_class):
         # deepcopy lebo nechceme aby prišiel niekto, v teste zmenil test_data a tak rozbil všetky
         # ostatné testy
         status = test["run"](logger_class('checker.' + test_name), copy.deepcopy(test_data))
+
+        if status == TestResult.WARNING and strict:
+            status = TestResult.ERROR
+
         results[status] += 1
 
         if status == TestResult.ERROR:
@@ -734,7 +738,7 @@ def execute(args, tests):
                  "solutions": solutions,
                  "inputs": inputs}
 
-    results = execute_tests(tests, test_data, ConsoleIssueLogger)
+    results = execute_tests(tests, test_data, ConsoleIssueLogger, args.strict)
 
     logger.info("Done\n\n")
 
