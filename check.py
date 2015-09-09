@@ -16,8 +16,8 @@
 # tak.) Test musí obsahovať neprázdny docstring ktorý v prvom riadku pár slovami popíše čo test robí
 # a v ostatných riadkoch (indentovaných 4mi medzerami) optionally test popíše detailnejšie.
 #
-# Test hlási chyby a iné veci loggeru ktorý mu je daný. Vráti jedno z TestResult.{OK, SKIP, WARNING,
-# ERROR}
+# Test hlási chyby a iné veci loggeru ktorý mu je daný. Vráti boolean (True je success), alebo jedno
+# z TestResult.{OK, SKIP, WARNING, ERROR}
 #
 # Na pridanie nového testu teda stačí napísať príslušnú fciu s dekorátorom a docstringom, o ostatné
 # sa starať netreba :)
@@ -51,23 +51,25 @@
 # Najskôr beží `main`. Jej úlohou je sparsovať argumenty ktore boli scriptu dané. Na základe týchto
 # argumentov spúšťa ostatné časti scriptu. Obvykle upraví zoznam testov ktoré majú bežať a spustí
 # funkciu `execute`. Táto funkcia zoberie cesty k zadaniam, vstupom a vzorákom a spustí na nich
-# funkcie `parse_{tasks,inputs,solutions}`. Tieto funkcie sa preiterujú súbormi so správnym menom, a
-# na každom súbore spustia `parse_{task,input,solution}`. Tieto funkcie sparsujú už konkrétny súbor.
-# Sú umiestnené v časti skriptu "PARSER" a určené na pravidelné menenie maintainerom testov pri
-# zmene formátu súborov. Funkcie `parse_{task,input,solution}` vrátia objekty sparsovaných vecí
-# funkciám `parse_{tasks,inputs,solutions}`. Tieto vrátia listy sparsovaných objektov funkcii
-# `execute`. Táto funkcia z týchto dát postaví `test_data` dict, ktorý sa neskôr bude dávať
-# jednotlivým testom. `execute` následne spustí funkciu `execute_tests` so zoznamom testov, dictom
-# `test_data` a classou loggera ktorú maju testy používať. `execute_tests` následne spúšťa
-# jednotlivé testy (pre každý vytvorí instanciu loggera s appropriate identifikátorom testu). Zoznam
-# so štatistikami ohľadom behu testov vráti `execute`, ktorý vypíše finálne hlášky a vygeneruje
-# vhodný return code.
+# funkcie `parse_{files,inputs}` (parsovanie úloh a vzorákov je tak podobné že to rieši jedna fcia
+# `parse_files`). Tieto funkcie sa preiterujú súbormi so správnym menom, a na každom súbore spustia
+# `parse_{task,solution}`. Tieto funkcie sparsujú už konkrétny súbor. Sú umiestnené v časti skriptu
+# "PARSER" a určené na pravidelné menenie maintainerom testov pri zmene formátu súborov. Funkcie
+# `parse_{task,input,solution}` vrátia objekty sparsovaných vecí funkciám
+# `parse_{tasks,inputs,solutions}`. Tieto vrátia listy sparsovaných objektov funkcii `execute`. Táto
+# funkcia z týchto dát postaví `test_data` dict, ktorý sa neskôr bude dávať jednotlivým testom.
+# `execute` následne spustí funkciu `execute_tests` so zoznamom testov, dictom `test_data` a classou
+# loggera ktorú maju testy používať. `execute_tests` následne spúšťa jednotlivé testy (pre každý
+# vytvorí instanciu loggera s appropriate identifikátorom testu). Zoznam so štatistikami ohľadom
+# behu testov je vrátení fcii `execute`, ktorá vypíše finálne hlášky a vygeneruje vhodný return
+# code.
 #
 # Čo týmto skriptom básnik myslel...
 # ----------------------------------
 #
 # Alebo náhodné poznámky pre náhodných maintainerov.
 #
+#  - Cieľ tohto skriptu nie je mať len implementované testy, ale aj zjednodušiť písanie nových
 #  - Dodržujte PEP-8 (okrem max dĺžky riadku, to nech je 100)
 #  - Snažte sa o konzistentný coding style
 #  - Nakoľko sa meno fcie testu používa v chybovej hláške o zlyhaní a tak, mená majú dávať zmysel
