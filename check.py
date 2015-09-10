@@ -85,6 +85,7 @@ import os
 import re
 import copy
 import glob
+import functools
 from enum import Enum
 
 logger = logging.getLogger('checker')
@@ -126,20 +127,20 @@ test = TestRegistrar()
 
 def require(listOfRequirements):
     def require_decorator(function):
+        @functools.wraps(function)
         def require_wrapper(logger, test_data):
             for requirement in listOfRequirements:
                 if requirement not in test_data.keys() or not test_data[requirement]:
                     logger.logMessage(logging.DEBUG, 'Nemám potrebné veci, skippupjem sa...')
                     return TestResult.SKIP
             return function(logger, test_data)
-        require_wrapper.__name__ = function.__name__
-        require_wrapper.__doc__ = function.__doc__
         return require_wrapper
     return require_decorator
 
 
 def for_each_item(items, bypassable=False):
     def foreach_decorator(function):
+        @functools.wraps(function)
         def wrapper(logger, test_data):
             success = True
             for item in test_data[items]:
@@ -151,8 +152,6 @@ def for_each_item(items, bypassable=False):
                 if not function(logger, item):
                     success = False
             return success
-        wrapper.__name__ = function.__name__
-        wrapper.__doc__ = function.__doc__
         return wrapper
     return foreach_decorator
 
