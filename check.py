@@ -135,7 +135,7 @@ class TestRegistrar():
 test = TestRegistrar()
 
 
-def for_each_item(items, bypassable=False):
+def for_each_item_in(items, bypassable=False):
     def foreach_decorator(function):
         @functools.wraps(function)
         def wrapper(logger, test_data):
@@ -194,7 +194,7 @@ def allTasksPresent(logger, test_data):
 
 
 @test(TestResult.ERROR, require=["tasks"])
-@for_each_item("tasks")
+@for_each_item_in("tasks")
 def taskComplete(logger, task):
     """Kontrola či úloha má meno a autora"""
 
@@ -209,7 +209,7 @@ def taskComplete(logger, task):
 
 
 @test(TestResult.WARNING, require=["tasks"])
-@for_each_item("tasks", bypassable=True)
+@for_each_item_in("tasks", bypassable=True)
 def taskProofreaded(logger, task):
     """Kontrola či je úloha sproofreadovaná"""
 
@@ -220,7 +220,7 @@ def taskProofreaded(logger, task):
 
 
 @test(TestResult.ERROR, require=["tasks"])
-@for_each_item("tasks", bypassable=True)
+@for_each_item_in("tasks", bypassable=True)
 def taskFirstLetter(logger, task):
     """Kontrola prvého písmenka úlohy.
 
@@ -239,7 +239,7 @@ def taskFirstLetter(logger, task):
 
 
 @test(TestResult.ERROR, require=["tasks"])
-@for_each_item("tasks", bypassable=True)
+@for_each_item_in("tasks", bypassable=True)
 def taskCorrectPoints(logger, task):
     """Kontrola správneho súčtu bodov.
 
@@ -262,7 +262,7 @@ def taskCorrectPoints(logger, task):
 
 
 @test(TestResult.ERROR, require=["tasks"])
-@for_each_item("tasks", bypassable=True)
+@for_each_item_in("tasks", bypassable=True)
 def taskSamplesEndWithUnixNewline(logger, task):
     """Kontrola či všetky príklady vstupu / výstupu končia s UNIX newline."""
 
@@ -284,7 +284,7 @@ def taskSamplesEndWithUnixNewline(logger, task):
 
 
 @test(TestResult.ERROR, require=["tasks"])
-@for_each_item("tasks", bypassable=True)
+@for_each_item_in("tasks", bypassable=True)
 def taskSamplesWhitespace(logger, task):
     """Kontrola či príklady vstupu / výstupu nekončia medzerou."""
 
@@ -323,7 +323,7 @@ def allSolutionsPresent(logger, test_data):
 
 
 @test(TestResult.ERROR, require=["solutions"])
-@for_each_item("solutions")
+@for_each_item_in("solutions")
 def solutionComplete(logger, solution):
     """Kontrola či vzorák má meno a autora."""
 
@@ -371,7 +371,7 @@ def solutionMatchesTask(logger, test_data):
 
 
 @test(TestResult.ERROR, require=["solutions"])
-@for_each_item("solutions")
+@for_each_item_in("solutions")
 def solutionAllListingsExist(logger, solution):
     """Kontrola či existujú všetky súbory listingov použité vo vzoráku."""
 
@@ -401,7 +401,7 @@ def taskHasInputs(logger, test_data):
 
 
 @test(TestResult.ERROR, require=["inputs"])
-@for_each_item("inputs")
+@for_each_item_in("inputs")
 def inputsHaveUnixNewlines(logger, tests):
     """Kontrola či majú vstupy UNIXácke newlines."""
 
@@ -420,7 +420,7 @@ def inputsHaveUnixNewlines(logger, tests):
 
 
 @test(TestResult.WARNING, require=["inputs"])
-@for_each_item("inputs")
+@for_each_item_in("inputs")
 def inputsNoTrailingWhitespace(logger, tests):
     """Kontrola či vstupy a výstupy nemajú medzery na konci riadkov."""
 
@@ -440,7 +440,7 @@ def inputsNoTrailingWhitespace(logger, tests):
 
 
 @test(TestResult.ERROR, require=["inputs"])
-@for_each_item("inputs")
+@for_each_item_in("inputs")
 def eachInputHasOutput(logger, tests):
     """Kontrola či každý .in súbor zo vstupov má prislúchajúci .out súbor"""
 
@@ -452,7 +452,7 @@ def eachInputHasOutput(logger, tests):
 
 
 @test(TestResult.ERROR, require=["inputs"])
-@for_each_item("inputs")
+@for_each_item_in("inputs")
 def inputHasNewlineAtEof(logger, tests):
     """Kontrola či posledný riadok vo vstupoch a výstupoch končí znakom nového riadku."""
 
