@@ -88,6 +88,9 @@ import re
 import copy
 import glob
 import functools
+import subprocess
+import tempfile
+import py_compile
 from enum import Enum
 
 logger = logging.getLogger('checker')
@@ -109,7 +112,7 @@ class TestRegistrar():
     def __init__(self):
         self.all = {}
 
-    def __call__(self, severity, require=[]):
+    def __call__(self, severity, require=[], ignore=False):
         def registrar_decorator(func):
             def wrapper(logger, test_data):
                 # Otestujeme či test má všetko potrebné pre svoj beh
@@ -128,7 +131,8 @@ class TestRegistrar():
                 else:
                     return status
 
-            self.all[func.__name__] = {"doc": func.__doc__, "run": wrapper}
+            if not ignore:
+                self.all[func.__name__] = {"doc": func.__doc__, "run": wrapper}
             return wrapper
         return registrar_decorator
 
@@ -385,6 +389,82 @@ def solutionAllListingsExist(logger, solution):
                             Issue("Listing {0} neexistuje!".format(match.group(1)),
                                   solution.filename, idx+1))
             success = False
+    return success
+
+
+@test(TestResult.WARNING, require=["solutions"], ignore=True)
+@for_each_item_in("solutions", bypassable=True)
+def solutionAllListingsCompileable(logger, solution):
+    """Kontrola či sú všetky listingy skompilovateľné.
+
+    Kontroluje všetky listingy s príponami .cc, .c++, .cpp, .py, .pas tak, že sa ich pokúsi
+    skompilovať. Ak sa nenájde príslušný compiler skippne sa checkovanie daného listingu."""
+
+    success = True
+    for idx, line in enumerate(solution.plaintext.splitlines()):
+        # Matchne '\listing{...}'
+        match = re.match('\\\\listing{([^}]*)}', line)
+
+        devnull = open(os.devnull, 'w')
+
+        if match:
+            temp_directory = tempfile.TemporaryDirectory()
+            listing_filename = os.path.join(os.path.dirname(solution.filename), match.group(1))
+            if os.path.isfile(listing_filename):
+
+                if (listing_filename.endswith('.cpp') or listing_filename.endswith('.cc') or
+                   listing_filename.endswith('.c++')):
+                    try:
+                        subprocess.check_call(['g++', '-v'], stdout=devnull, stderr=devnull)
+                    except subprocess.CalledProcessError:
+                        logger.logMessage(logging.DEBUG,
+                                          ("g++ nenájdené, skippujem checkovanie listingu {0}"
+                                           .format(listing_filename)))
+                        temp_directory.cleanup()
+                        continue
+
+                    try:
+                        subprocess.check_output(['g++', '-std=c++11', '-fdiagnostics-color=never',
+                                                 listing_filename, '-o',
+                                                 os.path.join(temp_directory.name, 'test.out')],
+                                                stderr=subprocess.STDOUT)
+                    except subprocess.CalledProcessError as e:
+                        logger.logIssue(logging.WARNING,
+                                        Issue(("Listing {0} nejde skompilovať!\n{1}"
+                                               .format(listing_filename, e.output.decode('utf-8'))),
+                                              solution.filename, idx+1))
+
+                elif listing_filename.endswith('.pas'):
+                    try:
+                        subprocess.check_call(['fpc', '-h'], stdout=devnull, stderr=devnull)
+                    except subprocess.CalledProcessError:
+                        logger.logMessage(logging.DEBUG,
+                                          ("fpc nenájdené, skippujem checkovanie listingu {0}"
+                                           .format(listing_filename)))
+                        temp_directory.cleanup()
+                        continue
+
+                    try:
+                        subprocess.check_output(['fpc', '-FE' + temp_directory.name,
+                                                 listing_filename], stderr=subprocess.STDOUT)
+                    except subprocess.CalledProcessError as e:
+                        logger.logIssue(logging.WARNING,
+                                        Issue(("Listing {0} nejde skompilovať!\n{1}"
+                                               .format(listing_filename, e.output.decode('utf-8'))),
+                                              solution.filename, idx+1))
+
+                elif listing_filename.endswith('.py'):
+                    try:
+                        py_compile.compile(listing_filename,
+                                           cfile=os.path.join(temp_directory.name, "out.pyc"),
+                                           doraise=True)
+                    except py_compile.PyCompileError:
+                        logger.logIssue(logging.WARNING,
+                                        Issue(("Listing {0} nejde skompilovať!\n{1}"
+                                               .format(listing_filename, e.output.decode('utf-8'))),
+                                              solution.filename, idx+1))
+
+            temp_directory.cleanup()
     return success
 
 
