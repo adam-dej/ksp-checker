@@ -31,8 +31,8 @@
 # @test: Týmto dekorátorom sa registruje test. Každá funkcia obsahujúca tento dekorátor je
 #        považovaná sa test. Dekorátor berie jeden parameter, a to je závažnosť testu. Ak test
 #        nevráti nejakú vec z TestResult v prípade vrátenia falsy objektu bude vrátená táto hodnota.
-# @require: Tento dekorátor spôsobí vrátenie TestResult.SKIP ak v test_data nie je potrebný údaj pre
-#           beh daného testu. Ako parameter berie list potrebných keys z test_data
+#        Nepovinný parameter je `require`. Je to list kľúčov ktoré musia byť v dicte `test_data`
+#        aby malo zmysel tento test spúštať. Ak niektorá z veci chýba, test vráti TestResult.SKIP
 # @for_each_item: Tento iterátor bere ako parameter kľúč do test_data. Spôsobí to, že sa preiteruje
 #                 cez test_data[parameter] a test spustí pre každý item miesto iba raz pre celé
 #                 test_data. Použitie tohto dekorátora mení hlavičku testu, a druhý parameter už nie
@@ -109,10 +109,18 @@ class TestRegistrar():
     def __init__(self):
         self.all = {}
 
-    def __call__(self, severity):
+    def __call__(self, severity, require=[]):
         def registrar_decorator(func):
             def wrapper(logger, test_data):
+                # Otestujeme či test má všetko potrebné pre svoj beh
+                for requirement in require:
+                    if requirement not in test_data.keys() or not test_data[requirement]:
+                        logger.logMessage(logging.DEBUG, 'Nemám potrebné veci, skippupjem sa...')
+                        return TestResult.SKIP
+
+                # Spustíme test
                 status = func(logger, test_data)
+
                 # Ak funkcia vráti boolean miesto TestResult, vráťme hodnotu parametra severity pri
                 # zlyhaní.
                 if not isinstance(status, TestResult):
@@ -125,19 +133,6 @@ class TestRegistrar():
         return registrar_decorator
 
 test = TestRegistrar()
-
-
-def require(listOfRequirements):
-    def require_decorator(function):
-        @functools.wraps(function)
-        def require_wrapper(logger, test_data):
-            for requirement in listOfRequirements:
-                if requirement not in test_data.keys() or not test_data[requirement]:
-                    logger.logMessage(logging.DEBUG, 'Nemám potrebné veci, skippupjem sa...')
-                    return TestResult.SKIP
-            return function(logger, test_data)
-        return require_wrapper
-    return require_decorator
 
 
 def for_each_item(items, bypassable=False):
@@ -181,8 +176,7 @@ class IssueLogger():
 
 # ---------------------------------- TESTY ------------------------------------
 
-@test(TestResult.ERROR)
-@require(["tasks"])
+@test(TestResult.ERROR, require=["tasks"])
 def allTasksPresent(logger, test_data):
     """Kontrola či existuje všetkých 8 úloh."""
 
@@ -199,8 +193,7 @@ def allTasksPresent(logger, test_data):
     return all(tasks_exist)
 
 
-@test(TestResult.ERROR)
-@require(["tasks"])
+@test(TestResult.ERROR, require=["tasks"])
 @for_each_item("tasks")
 def taskComplete(logger, task):
     """Kontrola či úloha má meno a autora"""
@@ -215,8 +208,7 @@ def taskComplete(logger, task):
     return success
 
 
-@test(TestResult.WARNING)
-@require(["tasks"])
+@test(TestResult.WARNING, require=["tasks"])
 @for_each_item("tasks", bypassable=True)
 def taskProofreaded(logger, task):
     """Kontrola či je úloha sproofreadovaná"""
@@ -227,8 +219,7 @@ def taskProofreaded(logger, task):
     return True
 
 
-@test(TestResult.ERROR)
-@require(["tasks"])
+@test(TestResult.ERROR, require=["tasks"])
 @for_each_item("tasks", bypassable=True)
 def taskFirstLetter(logger, task):
     """Kontrola prvého písmenka úlohy.
@@ -247,8 +238,7 @@ def taskFirstLetter(logger, task):
     return True
 
 
-@test(TestResult.ERROR)
-@require(["tasks"])
+@test(TestResult.ERROR, require=["tasks"])
 @for_each_item("tasks", bypassable=True)
 def taskCorrectPoints(logger, task):
     """Kontrola správneho súčtu bodov.
@@ -271,8 +261,7 @@ def taskCorrectPoints(logger, task):
     return True
 
 
-@test(TestResult.ERROR)
-@require(["tasks"])
+@test(TestResult.ERROR, require=["tasks"])
 @for_each_item("tasks", bypassable=True)
 def taskSamplesEndWithUnixNewline(logger, task):
     """Kontrola či všetky príklady vstupu / výstupu končia s UNIX newline."""
@@ -294,8 +283,7 @@ def taskSamplesEndWithUnixNewline(logger, task):
     return success
 
 
-@test(TestResult.ERROR)
-@require(["tasks"])
+@test(TestResult.ERROR, require=["tasks"])
 @for_each_item("tasks", bypassable=True)
 def taskSamplesWhitespace(logger, task):
     """Kontrola či príklady vstupu / výstupu nekončia medzerou."""
@@ -317,8 +305,7 @@ def taskSamplesWhitespace(logger, task):
     return success
 
 
-@test(TestResult.WARNING)
-@require(["solutions"])
+@test(TestResult.WARNING, require=["solutions"])
 def allSolutionsPresent(logger, test_data):
     """Kontrola či existujú všetky vzoráky."""
 
@@ -335,8 +322,7 @@ def allSolutionsPresent(logger, test_data):
     return all(solutions_exist)
 
 
-@test(TestResult.ERROR)
-@require(["solutions"])
+@test(TestResult.ERROR, require=["solutions"])
 @for_each_item("solutions")
 def solutionComplete(logger, solution):
     """Kontrola či vzorák má meno a autora."""
@@ -351,8 +337,7 @@ def solutionComplete(logger, solution):
     return success
 
 
-@test(TestResult.ERROR)
-@require(["tasks", "solutions"])
+@test(TestResult.ERROR, require=["tasks", "solutions"])
 def solutionMatchesTask(logger, test_data):
     """Kontrola či úloha a prislúchajúci vzorák majú rovnaké meno a rovnaké body."""
 
@@ -385,8 +370,7 @@ def solutionMatchesTask(logger, test_data):
     return success
 
 
-@test(TestResult.ERROR)
-@require(["solutions"])
+@test(TestResult.ERROR, require=["solutions"])
 @for_each_item("solutions")
 def solutionAllListingsExist(logger, solution):
     """Kontrola či existujú všetky súbory listingov použité vo vzoráku."""
@@ -404,8 +388,7 @@ def solutionAllListingsExist(logger, solution):
     return success
 
 
-@test(TestResult.WARNING)
-@require(["tasks", "inputs"])
+@test(TestResult.WARNING, require=["tasks", "inputs"])
 def taskHasInputs(logger, test_data):
     """Kontrola či každá úloha má vstupy."""
 
@@ -417,8 +400,7 @@ def taskHasInputs(logger, test_data):
     return success
 
 
-@test(TestResult.ERROR)
-@require(["inputs"])
+@test(TestResult.ERROR, require=["inputs"])
 @for_each_item("inputs")
 def inputsHaveUnixNewlines(logger, tests):
     """Kontrola či majú vstupy UNIXácke newlines."""
@@ -437,8 +419,7 @@ def inputsHaveUnixNewlines(logger, tests):
     return True
 
 
-@test(TestResult.WARNING)
-@require(["inputs"])
+@test(TestResult.WARNING, require=["inputs"])
 @for_each_item("inputs")
 def inputsNoTrailingWhitespace(logger, tests):
     """Kontrola či vstupy a výstupy nemajú medzery na konci riadkov."""
@@ -458,8 +439,7 @@ def inputsNoTrailingWhitespace(logger, tests):
     return success
 
 
-@test(TestResult.ERROR)
-@require(["inputs"])
+@test(TestResult.ERROR, require=["inputs"])
 @for_each_item("inputs")
 def eachInputHasOutput(logger, tests):
     """Kontrola či každý .in súbor zo vstupov má prislúchajúci .out súbor"""
@@ -471,8 +451,7 @@ def eachInputHasOutput(logger, tests):
     return True
 
 
-@test(TestResult.ERROR)
-@require(["inputs"])
+@test(TestResult.ERROR, require=["inputs"])
 @for_each_item("inputs")
 def inputHasNewlineAtEof(logger, tests):
     """Kontrola či posledný riadok vo vstupoch a výstupoch končí znakom nového riadku."""
