@@ -11,6 +11,21 @@ chcú checkovať súborovú štruktúru, filenames...), plaintexty zadaní (ak c
 checkovať newlines, trailing whitespace...) a sparsované zadania (ak chcú
 checkovať počty bodov, správnosť názvov úloh...)
 
+## Súbory
+
+  - `check.py` je hlavný executable súbor. Tento spúšťajte. test_utils.py` a
+  - `issue_utils.py` a `test_utils.py` sú pomocné drobnosti ktoré potrebujú
+    testy, parsery a hlavný script.
+  - `tests.py` - v tomto súbore sú definované rôzne testy ktoré sa majú spúštať
+  - `models.py` - v tomto súbore sú definované entity reprezentujúce zadania a
+    vzoráky a návody ako ich vyparsovať.
+
+Súborov `check.py`, `issue_utils.py` a `test_utils.py` by sa bežný testopísač
+nemal musieť chytať.
+
+Bežný testopísač by mal písať testy do `tests.py`. Ak by sa zmenil formát zadaní
+a / alebo vzorákov, bude nutné príslušne upraviť aj `models.py`.
+
 ## Test
 
 Test je obyčajná funkcia v sekcii skriptu "TESTY", ktorá je dekorovaná @test
@@ -42,7 +57,7 @@ vrátená táto hodnota. Nepovinný parameter je `require`. Je to list kľúčov
 musia byť v dicte `test_data` aby malo zmysel tento test spúštať. Ak niektorá z
 veci chýba, test vráti `TestResult.SKIP`
 
-### `@for_each_item`
+### `@for_each_item_in`
 
 Tento iterátor bere ako parameter kľúč do `test_data`. Spôsobí to, že sa
 preiteruje cez `test_data[parameter]` a test spustí pre každý item miesto iba
