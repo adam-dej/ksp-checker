@@ -13,7 +13,7 @@ checkovať počty bodov, správnosť názvov úloh...)
 
 ## Súbory
 
-  - `check.py` je hlavný executable súbor. Tento spúšťajte. test_utils.py` a
+  - `check.py` je hlavný executable súbor. Tento spúšťajte.
   - `issue_utils.py` a `test_utils.py` sú pomocné drobnosti ktoré potrebujú
     testy, parsery a hlavný script.
   - `tests.py` - v tomto súbore sú definované rôzne testy ktoré sa majú spúštať
