@@ -1,3 +1,7 @@
+import tempfile
+import subprocess
+import py_compile
+
 from test_utils import test, for_each_item_in, TestResult
 from models import *
 
@@ -214,7 +218,7 @@ def solutionAllListingsExist(logger, solution):
     return success
 
 
-@test(TestResult.WARNING, require=["solutions"], ignore=True)
+@test(TestResult.WARNING, require=["solutions"])
 @for_each_item_in("solutions", bypassable=True)
 def solutionAllListingsCompileable(logger, solution):
     """Kontrola či sú všetky listingy skompilovateľné.
@@ -238,8 +242,8 @@ def solutionAllListingsCompileable(logger, solution):
                    listing_filename.endswith('.c++')):
                     try:
                         subprocess.check_call(['g++', '-v'], stdout=devnull, stderr=devnull)
-                    except subprocess.CalledProcessError:
-                        logger.logMessage(logging.DEBUG,
+                    except (subprocess.CalledProcessError, FileNotFoundError):
+                        logger.logMessage(logging.INFO,
                                           ("g++ nenájdené, skippujem checkovanie listingu {0}"
                                            .format(listing_filename)))
                         temp_directory.cleanup()
@@ -259,8 +263,8 @@ def solutionAllListingsCompileable(logger, solution):
                 elif listing_filename.endswith('.pas'):
                     try:
                         subprocess.check_call(['fpc', '-h'], stdout=devnull, stderr=devnull)
-                    except subprocess.CalledProcessError:
-                        logger.logMessage(logging.DEBUG,
+                    except (subprocess.CalledProcessError, FileNotFoundError):
+                        logger.logMessage(logging.INFO,
                                           ("fpc nenájdené, skippujem checkovanie listingu {0}"
                                            .format(listing_filename)))
                         temp_directory.cleanup()
